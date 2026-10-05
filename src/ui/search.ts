@@ -1,4 +1,4 @@
-import { searchAnime } from "../api/jikan";
+import { searchAnime } from "../api/anilist";
 import type { AnimeSearchResult } from "../models/anime";
 
 export interface AnimeSearchField {

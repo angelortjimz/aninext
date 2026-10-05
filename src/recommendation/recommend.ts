@@ -1,4 +1,4 @@
-import { getAnime, getAnimeRelations } from "../api/jikan";
+import { getAnime, getAnimeRelations } from "../api/anilist";
 import type { Anime, CandidateSeed, RecommendationResult } from "../models/anime";
 import { DETAIL_CONCURRENCY } from "./config";
 import { buildCandidateSeeds } from "./candidates";
@@ -6,7 +6,7 @@ import { generateReasons } from "./reasons";
 import { rankCandidates, scoreCandidate } from "./scoring";
 
 function isExplicit(anime: Anime): boolean {
-  return anime.rating === "Rx - Hentai";
+  return anime.isAdult;
 }
 
 async function hydrateCandidates(seeds: CandidateSeed[]): Promise<Array<{ seed: CandidateSeed; anime: Anime }>> {

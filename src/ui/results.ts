@@ -34,5 +34,5 @@ export function renderNoMatch(target: HTMLElement): void {
 }
 
 export function renderError(target: HTMLElement): void {
-  target.innerHTML = `<section class="message-card"><h2>We could not find a recommendation</h2><p>Jikan is temporarily unavailable. Please try again in a moment.</p></section>`;
+  target.innerHTML = `<section class="message-card"><h2>We could not find a recommendation</h2><p>AniList is temporarily unavailable. Please try again in a moment.</p></section>`;
 }

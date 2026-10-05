@@ -1,5 +1,5 @@
 import "../style.css";
-import { getAnime } from "./api/jikan";
+import { getAnime } from "./api/anilist";
 import type { AnimeSearchResult } from "./models/anime";
 import { recommend } from "./recommendation/recommend";
 import { createAnimeSearchField, type AnimeSearchField } from "./ui/search";

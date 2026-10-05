@@ -15,7 +15,7 @@ const anime = (malId: number, overrides: Partial<Anime> = {}): Anime => ({
   genres: ["Drama", "Mystery"],
   themes: ["Psychological"],
   studios: ["Studio A"],
-  rating: "PG-13",
+  isAdult: false,
   ...overrides,
 });
 

@@ -11,7 +11,7 @@ export interface Anime extends AnimeSearchResult {
   genres: string[];
   themes: string[];
   studios: string[];
-  rating: string | null;
+  isAdult: boolean;
 }
 
 export interface RelatedAnime {
