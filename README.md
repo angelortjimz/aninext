@@ -7,15 +7,15 @@ A small, deterministic anime recommendation app powered by the AniList API. Pick
 Install dependencies, then start the Vite development server:
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Run checks with:
 
 ```bash
-npm test
-npm run build
+pnpm test
+pnpm build
 ```
 
 The app stores selections only in memory. It does not use accounts, a database, a backend, or an AI service.
