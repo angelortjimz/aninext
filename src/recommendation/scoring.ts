@@ -4,7 +4,7 @@ import { metadataSimilarity } from "./similarity";
 
 export function scoreCandidate(seed: CandidateSeed, anime: Anime, selected: Anime[]): Candidate {
   const comparisons = selected.map((source) => metadataSimilarity(anime, source));
-  const average = (field: "genre" | "theme" | "type" | "studio" | "total") =>
+  const average = (field: "genre" | "theme" | "type" | "studio" | "era" | "total") =>
     comparisons.reduce((total, score) => total + score[field], 0) / comparisons.length;
   const metadataScore = average("total");
   return {
@@ -14,6 +14,7 @@ export function scoreCandidate(seed: CandidateSeed, anime: Anime, selected: Anim
     themeScore: average("theme"),
     typeScore: average("type"),
     studioScore: average("studio"),
+    eraScore: average("era"),
     metadataScore,
     finalScore: seed.relationScore * SCORING_WEIGHTS.relation + metadataScore * SCORING_WEIGHTS.metadata,
     reasons: [],
@@ -22,6 +23,10 @@ export function scoreCandidate(seed: CandidateSeed, anime: Anime, selected: Anim
 
 export function rankCandidates(candidates: Candidate[]): Candidate[] {
   return [...candidates].sort(
-    (a, b) => b.finalScore - a.finalScore || b.sourceCount - a.sourceCount || a.malId - b.malId,
+    (a, b) =>
+      b.finalScore - a.finalScore ||
+      b.sourceCount - a.sourceCount ||
+      b.anime.popularity - a.anime.popularity ||
+      a.id - b.id,
   );
 }

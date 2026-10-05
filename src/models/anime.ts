@@ -1,5 +1,6 @@
 export interface AnimeSearchResult {
-  malId: number;
+  id: number;
+  malId: number | null;
   title: string;
   imageUrl: string | null;
   type: string | null;
@@ -11,25 +12,40 @@ export interface Anime extends AnimeSearchResult {
   genres: string[];
   themes: string[];
   studios: string[];
+  mainStudios: string[];
+  popularity: number;
   isAdult: boolean;
 }
 
 export interface RelatedAnime {
-  malId: number;
+  id: number;
   title: string;
   mediaType: string;
-  sourceMalId: number;
+  sourceId: number;
   relationType: string;
 }
 
+export interface CommunityRecommendation {
+  id: number;
+  title: string;
+  mediaType: string;
+  sourceId: number;
+  rating: number;
+}
+
+export interface AnimeConnections {
+  relations: RelatedAnime[];
+  recommendations: CommunityRecommendation[];
+}
+
 export interface CandidateRelation {
-  sourceMalId: number;
+  sourceId: number;
   relationType: string;
   weight: number;
 }
 
 export interface CandidateSeed {
-  malId: number;
+  id: number;
   title: string;
   relations: CandidateRelation[];
   sourceCount: number;
@@ -42,6 +58,7 @@ export interface Candidate extends CandidateSeed {
   themeScore: number;
   typeScore: number;
   studioScore: number;
+  eraScore: number;
   metadataScore: number;
   finalScore: number;
   reasons: string[];

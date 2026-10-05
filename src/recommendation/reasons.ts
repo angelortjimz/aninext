@@ -1,4 +1,5 @@
 import type { Anime, Candidate } from "../models/anime";
+import { COMMUNITY_RELATION_TYPE } from "./config";
 
 function sharedLabels(candidateLabels: string[], selected: Anime[], accessor: (anime: Anime) => string[]): string[] {
   return candidateLabels.filter((label) => {
@@ -11,6 +12,9 @@ export function generateReasons(candidate: Candidate, selected: Anime[]): string
   const reasons: string[] = [];
   if (candidate.sourceCount > 0) {
     reasons.push(`Connected to ${candidate.sourceCount} of your 3 selections`);
+  }
+  if (candidate.relations.some((relation) => relation.relationType === COMMUNITY_RELATION_TYPE)) {
+    reasons.push("Frequently recommended by fans of your selections");
   }
   const genres = sharedLabels(candidate.anime.genres, selected, (anime) => anime.genres).slice(0, 2);
   genres.forEach((genre) => reasons.push(`Shares ${genre} with at least 2 selections`));

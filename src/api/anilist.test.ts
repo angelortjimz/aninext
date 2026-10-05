@@ -3,7 +3,8 @@ import {
   AnilistError,
   clearAnilistCache,
   getAnime,
-  getAnimeRelations,
+  getAnimeBatch,
+  getAnimeConnections,
   normalizeAnime,
   normalizeSearchResult,
   searchAnime,
@@ -27,14 +28,16 @@ const media = {
     { name: "Philosophy", category: "Theme-Other" },
     { name: "Ensemble Cast", category: "Cast-Main Cast" },
   ],
-  studios: { nodes: [{ name: "Sunrise" }] },
+  studios: { edges: [{ isMain: true, node: { name: "Sunrise" } }] },
   coverImage: { large: "cover.jpg" },
   isAdult: false,
+  popularity: 1000,
 };
 
 describe("AniList normalization", () => {
   it("keeps the application model narrow", () => {
     expect(normalizeSearchResult(media)).toMatchObject({
+      id: 1,
       malId: 1,
       title: "Cowboy Bebop",
       imageUrl: "cover.jpg",
@@ -43,9 +46,12 @@ describe("AniList normalization", () => {
       episodes: 26,
     });
     expect(normalizeAnime(media)).toMatchObject({
+      id: 1,
       genres: ["Sci-Fi"],
       themes: ["Space", "Philosophy"],
       studios: ["Sunrise"],
+      mainStudios: ["Sunrise"],
+      popularity: 1000,
       isAdult: false,
     });
   });
@@ -58,6 +64,21 @@ describe("AniList normalization", () => {
   it("falls back through title languages", () => {
     expect(normalizeSearchResult({ ...media, title: { romaji: "R", native: "N" } }).title).toBe("R");
     expect(normalizeSearchResult({ ...media, title: { native: "N" } }).title).toBe("N");
+  });
+
+  it("keeps titles without a MAL id and ignores non-main studios", () => {
+    expect(normalizeSearchResult({ ...media, idMal: null }).malId).toBeNull();
+    const candidate = normalizeAnime({
+      ...media,
+      studios: {
+        edges: [
+          { isMain: true, node: { name: "Sunrise" } },
+          { isMain: false, node: { name: "Other" } },
+        ],
+      },
+    });
+    expect(candidate.studios).toEqual(["Sunrise", "Other"]);
+    expect(candidate.mainStudios).toEqual(["Sunrise"]);
   });
 });
 
@@ -77,7 +98,7 @@ describe("AniList requests", () => {
     expect(body.variables).toMatchObject({ search: "Cowboy", perPage: 5 });
   });
 
-  it("maps relation enums and drops entries without a MAL id", async () => {
+  it("maps relation enums and keeps anime without a MAL id", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -93,16 +114,70 @@ describe("AniList requests", () => {
                 { relationType: "OTHER", node: { id: 10, idMal: 10, title: { english: "Unknown type" }, format: "TV" } },
               ],
             },
+            recommendations: { edges: [] },
           },
         },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    const relations = await getAnimeRelations(1);
-    expect(relations).toEqual([
-      { malId: 5, title: "The Movie", mediaType: "anime", sourceMalId: 1, relationType: "Side Story" },
-      { malId: 173, title: "The Manga", mediaType: "manga", sourceMalId: 1, relationType: "Adaptation" },
+    const connections = await getAnimeConnections(1);
+    expect(connections.relations).toEqual([
+      { id: 5, title: "The Movie", mediaType: "anime", sourceId: 1, relationType: "SIDE_STORY" },
+      { id: 30173, title: "The Manga", mediaType: "manga", sourceId: 1, relationType: "ADAPTATION" },
+      { id: 9, title: "No MAL id", mediaType: "anime", sourceId: 1, relationType: "SPIN_OFF" },
     ]);
+    expect(connections.recommendations).toEqual([]);
+  });
+
+  it("collects community recommendations and keeps unrated ones", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      json: async () => ({
+        data: {
+          Media: {
+            relations: { edges: [] },
+            recommendations: {
+              edges: [
+                { node: { rating: 42, mediaRecommendation: { id: 20, idMal: 20, title: { english: "Top Pick" }, format: "TV", type: "ANIME" } } },
+                { node: { rating: null, mediaRecommendation: { id: 21, idMal: 21, title: { english: "Unrated" }, format: "TV", type: "ANIME" } } },
+                { node: { rating: 10, mediaRecommendation: null } },
+                { node: { rating: 5, mediaRecommendation: { id: 22, idMal: 22, title: { english: "Manga Rec" }, format: "MANGA", type: "MANGA" } } },
+              ],
+            },
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const connections = await getAnimeConnections(1);
+    expect(connections.recommendations).toEqual([
+      { id: 20, title: "Top Pick", mediaType: "anime", sourceId: 1, rating: 42 },
+      { id: 21, title: "Unrated", mediaType: "anime", sourceId: 1, rating: 0 },
+      { id: 22, title: "Manga Rec", mediaType: "manga", sourceId: 1, rating: 5 },
+    ]);
+  });
+
+  it("fetches multiple anime in one batched request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, headers: new Map(), json: async () => ({ data: { Page: { media: [media, { ...media, id: 2, idMal: 2 }] } } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const anime = await getAnimeBatch([2, 1, 2]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.query).toContain("id_in");
+    expect(body.variables).toMatchObject({ ids: [2, 1], perPage: 2 });
+    expect(anime.map((item) => item.id)).toEqual([1, 2]);
+  });
+
+  it("returns an empty batch without requesting", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getAnimeBatch([])).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("surfaces GraphQL errors returned with a 200 response", async () => {
@@ -130,6 +205,6 @@ describe("AniList requests", () => {
     vi.stubGlobal("fetch", fetchMock);
     const anime = await getAnime(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(anime.malId).toBe(1);
+    expect(anime.id).toBe(1);
   });
 });

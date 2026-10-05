@@ -1,6 +1,6 @@
 # Next Frame
 
-A small, deterministic anime recommendation app powered by the AniList API. Pick three distinct anime and receive one SFW, discovery-first recommendation based on eligible related titles and metadata similarity.
+A small, deterministic anime recommendation app powered by the AniList API. Pick three distinct anime and receive one SFW, discovery-first recommendation based on eligible related titles, community recommendations, and metadata similarity.
 
 ## Run locally
 

@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { Anime, RelatedAnime } from "../models/anime";
+import type { Anime, CommunityRecommendation, RelatedAnime } from "../models/anime";
 import { buildCandidateSeeds } from "./candidates";
 import { generateReasons } from "./reasons";
 import { rankCandidates, scoreCandidate } from "./scoring";
-import { jaccardSimilarity, typeSimilarity } from "./similarity";
+import { eraSimilarity, jaccardSimilarity, typeSimilarity } from "./similarity";
 
-const anime = (malId: number, overrides: Partial<Anime> = {}): Anime => ({
-  malId,
-  title: `Anime ${malId}`,
+const anime = (id: number, overrides: Partial<Anime> = {}): Anime => ({
+  id,
+  malId: id,
+  title: `Anime ${id}`,
   imageUrl: null,
   type: "TV",
   year: 2020,
@@ -15,6 +16,8 @@ const anime = (malId: number, overrides: Partial<Anime> = {}): Anime => ({
   genres: ["Drama", "Mystery"],
   themes: ["Psychological"],
   studios: ["Studio A"],
+  mainStudios: ["Studio A"],
+  popularity: 100,
   isAdult: false,
   ...overrides,
 });
@@ -32,36 +35,108 @@ describe("similarity", () => {
     expect(typeSimilarity(anime(1), anime(2, { type: "Movie" }))).toBe(0);
     expect(typeSimilarity(anime(1, { type: null }), anime(2, { type: null }))).toBe(0);
   });
+
+  it("scores closer release years higher", () => {
+    expect(eraSimilarity(anime(1), anime(2))).toBe(1);
+    expect(eraSimilarity(anime(1), anime(2, { year: 2025 }))).toBe(0.5);
+    expect(eraSimilarity(anime(1), anime(2, { year: 2030 }))).toBe(0);
+    expect(eraSimilarity(anime(1), anime(2, { year: null }))).toBe(0);
+  });
+
+  it("compares main studios only", () => {
+    const candidate = anime(10, { studios: ["Studio A", "Studio B"], mainStudios: ["Studio B"] });
+    expect(jaccardSimilarity(candidate.mainStudios, anime(1).mainStudios)).toBe(0);
+    expect(jaccardSimilarity(anime(1).mainStudios, anime(1).mainStudios)).toBe(1);
+  });
 });
 
 describe("candidate generation and ranking", () => {
   const selected = [anime(1), anime(2), anime(3)];
-  const relation = (sourceMalId: number, malId: number, relationType: string, mediaType = "anime"): RelatedAnime => ({
-    sourceMalId, malId, relationType, mediaType, title: `Anime ${malId}`,
+  const relation = (sourceId: number, id: number, relationType: string, mediaType = "anime"): RelatedAnime => ({
+    sourceId, id, relationType, mediaType, title: `Anime ${id}`,
+  });
+  const recommendation = (sourceId: number, id: number, rating = 10): CommunityRecommendation => ({
+    sourceId, id, rating, mediaType: "anime", title: `Anime ${id}`,
   });
 
   it("filters unsafe relation types and deduplicates strongest source links", () => {
-    const seeds = buildCandidateSeeds(selected, [
-      [relation(1, 10, "Side Story"), relation(1, 10, "Other"), relation(1, 11, "Sequel")],
-      [relation(2, 10, "Spin-off"), relation(2, 12, "Other", "manga")],
-      [relation(3, 1, "Other")],
-    ]);
+    const seeds = buildCandidateSeeds(
+      selected,
+      [
+        [relation(1, 10, "SIDE_STORY"), relation(1, 10, "OTHER"), relation(1, 11, "SEQUEL")],
+        [relation(2, 10, "SPIN_OFF"), relation(2, 12, "OTHER", "manga")],
+        [relation(3, 1, "OTHER")],
+      ],
+      [[], [], []],
+    );
     expect(seeds).toHaveLength(1);
-    expect(seeds[0]).toMatchObject({ malId: 10, sourceCount: 2, relationScore: 0.5 });
+    expect(seeds[0]).toMatchObject({ id: 10, sourceCount: 2, relationScore: 0.5 });
     expect(seeds[0].relations).toHaveLength(2);
   });
 
-  it("uses final score, source count, then MAL id for stable ordering", () => {
-    const seed = buildCandidateSeeds(selected, [[relation(1, 10, "Side Story")], [relation(2, 11, "Side Story")], []]);
-    const first = scoreCandidate(seed[0], anime(10), selected);
-    const second = scoreCandidate(seed[1], anime(11), selected);
-    expect(rankCandidates([second, first]).map((candidate) => candidate.malId)).toEqual([10, 11]);
+  it("includes same-universe relations as discovery candidates", () => {
+    const seeds = buildCandidateSeeds(
+      selected,
+      [[relation(1, 10, "SAME_UNIVERSE")], [relation(2, 10, "SAME_UNIVERSE")], []],
+      [[], [], []],
+    );
+    expect(seeds).toHaveLength(1);
+    expect(seeds[0]).toMatchObject({ id: 10, sourceCount: 2, relationScore: 1 / 3 });
   });
 
-  it("produces factual reasons", () => {
-    const seed = buildCandidateSeeds(selected, [[relation(1, 10, "Side Story")], [relation(2, 10, "Spin-off")], []])[0];
+  it("includes community recommendations as candidates", () => {
+    const seeds = buildCandidateSeeds(
+      selected,
+      [[], [], []],
+      [[recommendation(1, 10, 30)], [recommendation(2, 10, 12)], []],
+    );
+    expect(seeds).toHaveLength(1);
+    expect(seeds[0]).toMatchObject({ id: 10, sourceCount: 2, relationScore: 1 / 3 });
+    expect(seeds[0].relations.every((item) => item.relationType === "COMMUNITY")).toBe(true);
+  });
+
+  it("keeps the strongest link when a source relates and recommends the same title", () => {
+    const seeds = buildCandidateSeeds(
+      selected,
+      [[relation(1, 10, "OTHER")], [], []],
+      [[recommendation(1, 10)], [], []],
+    );
+    expect(seeds[0].relations).toHaveLength(1);
+    expect(seeds[0].relations[0]).toMatchObject({ sourceId: 1, relationType: "COMMUNITY", weight: 0.5 });
+  });
+
+  it("uses final score, source count, then popularity and id for stable ordering", () => {
+    const seeds = buildCandidateSeeds(
+      selected,
+      [[relation(1, 10, "SIDE_STORY")], [relation(2, 11, "SIDE_STORY")], []],
+      [[], [], []],
+    );
+    const first = scoreCandidate(seeds[0], anime(10, { popularity: 500 }), selected);
+    const second = scoreCandidate(seeds[1], anime(11, { popularity: 100 }), selected);
+    expect(rankCandidates([second, first]).map((candidate) => candidate.id)).toEqual([10, 11]);
+  });
+
+  it("breaks equal scores by popularity", () => {
+    const seeds = buildCandidateSeeds(
+      selected,
+      [[relation(1, 10, "SIDE_STORY")], [relation(2, 11, "SIDE_STORY")], []],
+      [[], [], []],
+    );
+    const first = scoreCandidate(seeds[0], anime(10, { popularity: 100 }), selected);
+    const second = scoreCandidate(seeds[1], anime(11, { popularity: 900 }), selected);
+    expect(rankCandidates([second, first]).map((candidate) => candidate.id)).toEqual([11, 10]);
+  });
+
+  it("produces factual reasons including community recommendations", () => {
+    const seed = buildCandidateSeeds(
+      selected,
+      [[relation(1, 10, "SIDE_STORY")], [relation(2, 10, "SPIN_OFF")], []],
+      [[], [], [recommendation(3, 10)]],
+    )[0];
     const candidate = scoreCandidate(seed, anime(10), selected);
-    expect(generateReasons(candidate, selected)).toContain("Connected to 2 of your 3 selections");
-    expect(generateReasons(candidate, selected)).toContain("Shares Drama with at least 2 selections");
+    const reasons = generateReasons(candidate, selected);
+    expect(reasons).toContain("Connected to 3 of your 3 selections");
+    expect(reasons).toContain("Frequently recommended by fans of your selections");
+    expect(reasons).toContain("Shares Drama with at least 2 selections");
   });
 });

@@ -1,5 +1,5 @@
 import "../style.css";
-import { getAnime } from "./api/anilist";
+import { getAnimeBatch } from "./api/anilist";
 import type { AnimeSearchResult } from "./models/anime";
 import { recommend } from "./recommendation/recommend";
 import { createAnimeSearchField, type AnimeSearchField } from "./ui/search";
@@ -40,7 +40,7 @@ function selections(): AnimeSearchResult[] {
 
 function refreshAction(): void {
   const selected = selections();
-  const hasDuplicate = new Set(selected.map((item) => item.malId)).size !== selected.length;
+  const hasDuplicate = new Set(selected.map((item) => item.id)).size !== selected.length;
   error.textContent = hasDuplicate ? "Please select three different anime." : "";
   action.disabled = selected.length !== 3 || hasDuplicate;
 }
@@ -55,7 +55,10 @@ action.addEventListener("click", async () => {
   fields.forEach((field) => field.setDisabled(true));
   resultRegion.innerHTML = `<section class="message-card loading"><span class="spinner" aria-hidden="true"></span><p>Finding your next frame...</p></section>`;
   try {
-    const detailed = await Promise.all(selected.map((item) => getAnime(item.malId)));
+    const detailed = await getAnimeBatch(selected.map((item) => item.id));
+    if (detailed.length !== selected.length) {
+      throw new Error("One of the selections is no longer available on AniList.");
+    }
     const result = await recommend(detailed);
     if (result.kind === "recommendation") renderRecommendation(resultRegion, result.recommendation);
     else renderNoMatch(resultRegion);
