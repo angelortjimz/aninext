@@ -6,8 +6,9 @@ import {
   type JSX,
   type KeyboardEvent,
 } from "react";
-import { searchAnime } from "../api/anilist";
+import { SEARCH_MIN_LENGTH, searchAnime } from "../api/anilist";
 import type { AnimeSearchResult } from "../models/anime";
+import { SEARCH_DEBOUNCE_MS } from "./config";
 
 interface SearchFieldProps {
   index: number;
@@ -58,8 +59,8 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
     controllerRef.current?.abort();
     dismissMatches();
     const trimmed = value.trim();
-    if (trimmed.length < 2) {
-      setStatus(trimmed ? "Enter at least 2 characters" : "");
+    if (trimmed.length < SEARCH_MIN_LENGTH) {
+      setStatus(trimmed ? `Enter at least ${SEARCH_MIN_LENGTH} characters` : "");
       return;
     }
     setStatus("Searching...");
@@ -75,7 +76,7 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
         if (error instanceof DOMException && error.name === "AbortError") return;
         setStatus("Search is unavailable. Try again.");
       }
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {

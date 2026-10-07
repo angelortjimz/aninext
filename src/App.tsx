@@ -1,9 +1,10 @@
 import { useState, type JSX } from "react";
 import { getAnimeBatch } from "./api/anilist";
 import type { AnimeSearchResult } from "./models/anime";
+import type { UiState } from "./models/ui";
 import { recommend } from "./recommendation/recommend";
 import { SearchField } from "./ui/SearchField";
-import { ResultRegion, type UiState } from "./ui/ResultRegion";
+import { ResultRegion } from "./ui/ResultRegion";
 
 const FIELD_COUNT = 3;
 
@@ -59,7 +60,7 @@ export function App(): JSX.Element {
           <p>Select an exact match from each search.</p>
         </div>
         <div className="search-grid">
-          {Array.from({ length: FIELD_COUNT }, (_, index) => (
+          {selections.map((_, index) => (
             <SearchField
               key={index}
               index={index + 1}

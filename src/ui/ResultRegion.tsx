@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import type { Recommendation } from "../models/anime";
+import type { UiState } from "../models/ui";
 
 function details(recommendation: Recommendation): string {
   const anime = recommendation.anime;
@@ -80,11 +81,3 @@ export function ResultRegion({ ui }: { ui: UiState }): JSX.Element | null {
   }
   return <RecommendationCard recommendation={ui.recommendation} />;
 }
-
-export type UiState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "recommendation"; recommendation: Recommendation }
-  | { kind: "no-match" }
-  | { kind: "unavailable" }
-  | { kind: "error" };

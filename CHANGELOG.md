@@ -61,6 +61,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `recommend()` no longer mutates the winning candidate to attach reasons;
   reasons are computed into the returned recommendation
 
+### Changed
+
+- Retry decisions in the API client now go through a single
+  `isRetryable(status)` helper instead of repeating the condition in the
+  request and catch paths
+- Tunable numbers moved into config modules: reason caps
+  (`MAX_REASON_GENRES`, `MAX_REASON_THEMES`), the shared-selection
+  threshold (`MIN_SHARED_SELECTIONS`), `REQUIRED_SELECTIONS`, and the
+  search debounce (`SEARCH_DEBOUNCE_MS`). Reason text now derives its
+  counts from the selection list instead of hardcoding "3" and "2"
+- `UiState` moved from `src/ui/ResultRegion.tsx` to `src/models/ui.ts`
+- `style.css` moved to `src/styles.css`
+- Tests run in the default node environment; `jsdom` is no longer
+  configured globally now that the API layer no longer uses `window`
+- The three search fields render from the `selections` array rather than a
+  second `Array.from` over the same count
+
+### Removed
+
+- Five `FORMAT_LABELS` entries that were identical to the existing
+  underscore-to-space fallback (`TV`, `SPECIAL`, `OVA`, `ONA`, `MUSIC`)
+
 ### Added
 
 - React 19 (`react`, `react-dom`) with `@vitejs/plugin-react` — the UI is

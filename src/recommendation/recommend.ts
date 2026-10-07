@@ -1,6 +1,7 @@
 import { getAnimeBatch, getAnimeConnections } from "../api/anilist";
 import type { Anime, Candidate, CandidateSeed, RecommendationResult } from "../models/anime";
 import { buildCandidateSeeds } from "./candidates";
+import { REQUIRED_SELECTIONS } from "./config";
 import { generateReasons } from "./reasons";
 import { rankCandidates, scoreCandidate } from "./scoring";
 
@@ -16,8 +17,11 @@ async function hydrateCandidates(seeds: CandidateSeed[], selected: Anime[]): Pro
 }
 
 export async function recommend(selected: Anime[]): Promise<RecommendationResult> {
-  if (selected.length !== 3 || new Set(selected.map((anime) => anime.id)).size !== 3) {
-    throw new Error("Three different anime are required for a recommendation.");
+  const distinctIds = new Set(selected.map((anime) => anime.id)).size;
+  if (selected.length !== REQUIRED_SELECTIONS || distinctIds !== REQUIRED_SELECTIONS) {
+    throw new Error(
+      `${REQUIRED_SELECTIONS} different anime are required for a recommendation.`,
+    );
   }
   const connections = await Promise.all(selected.map((anime) => getAnimeConnections(anime.id)));
   const seeds = buildCandidateSeeds(

@@ -8,6 +8,7 @@ import type {
 
 const BASE_URL = "https://graphql.anilist.co";
 const SEARCH_LIMIT = 5;
+export const SEARCH_MIN_LENGTH = 2;
 const BATCH_LIMIT = 50;
 const RECOMMENDATION_LIMIT = 25;
 const MAX_RETRIES = 2;
@@ -154,13 +155,8 @@ const BATCH_QUERY = `
 `;
 
 const FORMAT_LABELS: Readonly<Record<string, string>> = {
-  TV: "TV",
   TV_SHORT: "TV Short",
   MOVIE: "Movie",
-  SPECIAL: "Special",
-  OVA: "OVA",
-  ONA: "ONA",
-  MUSIC: "Music",
 };
 
 // AniList files MAL-style themes under "Theme-*" and "Setting-*" tag
@@ -201,8 +197,6 @@ function formatLabel(media: Pick<AnilistMedia, "format">): string | null {
   return FORMAT_LABELS[format] ?? format.replace(/_/g, " ");
 }
 
-// The queries request `studios(isMain: true)`, so every edge returned is already
-// a main studio and no client-side `isMain` filtering is needed.
 function mainStudios(media: AnilistMedia): string[] {
   return (media.studios?.edges ?? []).flatMap((edge) => {
     const name = edge?.node?.name?.trim();
@@ -303,6 +297,10 @@ function retryAfterMs(response: Response): number | null {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
 }
 
+function isRetryable(status: number | undefined): boolean {
+  return status === 429 || (status ?? 0) >= 500;
+}
+
 async function fetchJson<T>(
   query: string,
   variables: Record<string, unknown>,
@@ -310,6 +308,7 @@ async function fetchJson<T>(
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    const backoff = 500 * 2 ** attempt;
     try {
       const response = await fetch(BASE_URL, {
         method: "POST",
@@ -318,8 +317,6 @@ async function fetchJson<T>(
         signal,
       });
       const payload = (await response.json()) as AnilistResponse<T>;
-      // AniList reports GraphQL failures in the response body, sometimes with
-      // a 200 status, so the error list decides whether a request succeeded.
       const graphQlError = payload.errors?.[0];
       const status = response.ok ? (graphQlError?.status ?? 200) : response.status;
       if (response.ok && !graphQlError) {
@@ -328,18 +325,18 @@ async function fetchJson<T>(
         }
         return payload.data;
       }
-      if (status !== 429 && status < 500) {
+      if (!isRetryable(status)) {
         throw new AnilistError("AniList could not retrieve this anime.", status);
       }
       lastError = new AnilistError("AniList is temporarily unavailable.", status);
       if (attempt < MAX_RETRIES) {
-        await delay(retryAfterMs(response) ?? 500 * 2 ** attempt, signal);
+        await delay(retryAfterMs(response) ?? backoff, signal);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
-      if (error instanceof AnilistError && error.status !== 429 && (error.status ?? 0) < 500) throw error;
+      if (error instanceof AnilistError && !isRetryable(error.status)) throw error;
       lastError = error;
-      if (attempt < MAX_RETRIES) await delay(500 * 2 ** attempt, signal);
+      if (attempt < MAX_RETRIES) await delay(backoff, signal);
     }
   }
   if (lastError instanceof AnilistError) throw lastError;
@@ -348,10 +345,8 @@ async function fetchJson<T>(
 
 const cache = new Map<string, Promise<unknown>>();
 
-// A cached promise is bound to the AbortSignal of the call that created it.
-// Sharing one with a caller that brought its own signal would let the first
-// caller's abort reject the second caller's request, so abortable callers
-// bypass the cache entirely and only signal-less callers read and fill it.
+// A cached promise is bound to the creating call's AbortSignal, so abortable
+// callers bypass the cache rather than inherit someone else's abort.
 function cached<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (signal) return load();
   const current = cache.get(key) as Promise<T> | undefined;
@@ -366,7 +361,7 @@ function cached<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): P
 
 export async function searchAnime(query: string, signal?: AbortSignal): Promise<AnimeSearchResult[]> {
   const cleanQuery = query.trim();
-  if (cleanQuery.length < 2) return [];
+  if (cleanQuery.length < SEARCH_MIN_LENGTH) return [];
   const variables = { search: cleanQuery, page: 1, perPage: SEARCH_LIMIT };
   const key = `search:${cleanQuery}`;
   return cached(

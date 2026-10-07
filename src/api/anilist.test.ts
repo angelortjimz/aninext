@@ -42,10 +42,8 @@ const media = {
 };
 
 /**
- * Builds a fetch-Response stand-in with a real `Headers` instance. An earlier
- * version used `new Map()`, whose `get` returns `undefined` where a real
- * `Headers.get` returns `null`; that difference hid a broken `Retry-After`
- * fallback from these tests.
+ * A fetch-Response stand-in using a real `Headers`, whose `get` returns `null`
+ * for a missing key. A `Map` returns `undefined` and hides header handling bugs.
  */
 function jsonResponse(
   body: unknown,
@@ -71,8 +69,8 @@ function errorResponse(status: number, headers: Record<string, string> = {}): un
 function stubFetch(...responses: unknown[]): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn();
   for (const response of responses) fetchMock.mockResolvedValueOnce(response);
-  // Deliberately a *retryable* server error rather than a 200 with `data: null`,
-  // which the client treats as a terminal error and would stop the retry loop.
+  // A 200 with `data: null` is terminal to the client, so the fallback must be
+  // a retryable error to keep the retry loop going.
   fetchMock.mockResolvedValue(errorResponse(503));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -102,8 +100,7 @@ function abortError(): DOMException {
   return new DOMException("The request was cancelled.", "AbortError");
 }
 
-/** `getAnime` was removed in favour of the batch endpoint; this keeps the
- * single-anime tests readable. */
+/** Single-anime convenience over the batch endpoint, which is all the app uses. */
 async function loadAnime(id: number): Promise<Anime> {
   const [anime] = await getAnimeBatch([id]);
   if (!anime) throw new AnilistError(`AniList returned no details for ${id}.`);
