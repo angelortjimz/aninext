@@ -62,6 +62,14 @@ export function ResultRegion({ ui }: { ui: UiState }): JSX.Element | null {
       </section>
     );
   }
+  if (ui.kind === "unavailable") {
+    return (
+      <section className="message-card">
+        <h2>One selection is no longer available</h2>
+        <p>AniList no longer lists one of the anime you picked. Clear that field and try again.</p>
+      </section>
+    );
+  }
   if (ui.kind === "error") {
     return (
       <section className="message-card">
@@ -78,4 +86,5 @@ export type UiState =
   | { kind: "loading" }
   | { kind: "recommendation"; recommendation: Recommendation }
   | { kind: "no-match" }
+  | { kind: "unavailable" }
   | { kind: "error" };

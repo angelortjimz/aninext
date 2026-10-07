@@ -32,7 +32,8 @@ export function App(): JSX.Element {
     try {
       const detailed = await getAnimeBatch(selected.map((item) => item.id));
       if (detailed.length !== selected.length) {
-        throw new Error("One of the selections is no longer available on AniList.");
+        setUi({ kind: "unavailable" });
+        return;
       }
       const result = await recommend(detailed);
       setUi(

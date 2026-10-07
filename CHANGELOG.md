@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Retry backoff was effectively disabled. A missing `Retry-After` header
+  returned `null`, and `Number(null)` is `0`, which passed the
+  `Number.isFinite` check — so every 429/5xx retry waited 0 ms instead of
+  backing off exponentially
+- Aborting one search no longer fails a concurrent search for the same
+  query. The response cache stored a promise bound to the first caller's
+  `AbortSignal`, so a second caller inherited it and died with its
+  `AbortError`; abortable calls now bypass the cache
+- Search suggestions use a valid ARIA combobox/listbox pattern. Options
+  were `<button role="option">` inside a `role="listbox"` container;
+  they are now `<li role="option">` with `aria-selected`, and the input
+  exposes `aria-expanded`, `aria-controls`, `aria-autocomplete` and
+  `aria-activedescendant`
+- Search suggestions are keyboard navigable: arrow keys move the active
+  option, `Enter` selects it, `Escape` dismisses the list
+- An anime that AniList no longer lists now shows "One selection is no
+  longer available" instead of the generic failure message. The previous
+  code threw an error that was immediately caught and discarded
+
 ### Added
 
 - React 19 (`react`, `react-dom`) with `@vitejs/plugin-react` — the UI is

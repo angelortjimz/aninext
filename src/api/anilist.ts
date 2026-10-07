@@ -316,16 +316,27 @@ function toCommunityRecommendation(
 
 function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(resolve, milliseconds);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        window.clearTimeout(timeout);
-        reject(new DOMException("The request was cancelled.", "AbortError"));
-      },
-      { once: true },
-    );
+    if (signal?.aborted) {
+      reject(new DOMException("The request was cancelled.", "AbortError"));
+      return;
+    }
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    function onAbort(): void {
+      clearTimeout(timeout);
+      reject(new DOMException("The request was cancelled.", "AbortError"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+function retryAfterMs(response: Response): number | null {
+  const header = response.headers.get("Retry-After");
+  if (header === null || header.trim() === "") return null;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
 }
 
 async function fetchJson<T>(
@@ -357,9 +368,8 @@ async function fetchJson<T>(
         throw new AnilistError("AniList could not retrieve this anime.", status);
       }
       lastError = new AnilistError("AniList is temporarily unavailable.", status);
-      const retryAfter = Number(response.headers.get("Retry-After"));
       if (attempt < MAX_RETRIES) {
-        await delay(Number.isFinite(retryAfter) ? retryAfter * 1000 : 500 * 2 ** attempt, signal);
+        await delay(retryAfterMs(response) ?? 500 * 2 ** attempt, signal);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -374,7 +384,12 @@ async function fetchJson<T>(
 
 const cache = new Map<string, Promise<unknown>>();
 
-function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+// A cached promise is bound to the AbortSignal of the call that created it.
+// Sharing one with a caller that brought its own signal would let the first
+// caller's abort reject the second caller's request, so abortable callers
+// bypass the cache entirely and only signal-less callers read and fill it.
+function cached<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (signal) return load();
   const current = cache.get(key) as Promise<T> | undefined;
   if (current) return current;
   const request = load().catch((error: unknown) => {
@@ -390,12 +405,16 @@ export async function searchAnime(query: string, signal?: AbortSignal): Promise<
   if (cleanQuery.length < 2) return [];
   const variables = { search: cleanQuery, page: 1, perPage: SEARCH_LIMIT };
   const key = `search:${cleanQuery}`;
-  return cached(key, async () => {
-    const response = await fetchJson<AnilistPageResponse>(SEARCH_QUERY, variables, signal);
-    const media = response.Page?.media;
-    if (!Array.isArray(media)) throw new AnilistError("AniList returned an invalid search response.");
-    return media.map(normalizeSearchResult);
-  });
+  return cached(
+    key,
+    async () => {
+      const response = await fetchJson<AnilistPageResponse>(SEARCH_QUERY, variables, signal);
+      const media = response.Page?.media;
+      if (!Array.isArray(media)) throw new AnilistError("AniList returned an invalid search response.");
+      return media.map(normalizeSearchResult);
+    },
+    signal,
+  );
 }
 
 export function getAnime(id: number): Promise<Anime> {
