@@ -27,6 +27,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   longer available" instead of the generic failure message. The previous
   code threw an error that was immediately caught and discarded
 
+### Changed
+
+- Test infrastructure hardened: fetch mocks use real `Headers` objects
+  rather than `Map`, retry and abort tests drive fake timers instead of
+  sleeping, `vi.stubGlobal` is undone with `vi.unstubAllGlobals()`, and
+  the response cache is cleared in `beforeEach`. The previous `Map`
+  mock returned `undefined` where a real `Headers` returns `null`,
+  which is what allowed the broken retry backoff to pass CI
+- Added coverage for retry backoff timing, retry exhaustion, cache
+  eviction on failure, batch splitting above the AniList page limit,
+  and abort isolation between concurrent searches
+
 ### Added
 
 - React 19 (`react`, `react-dom`) with `@vitejs/plugin-react` — the UI is
