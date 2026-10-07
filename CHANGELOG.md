@@ -38,6 +38,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added coverage for retry backoff timing, retry exhaustion, cache
   eviction on failure, batch splitting above the AniList page limit,
   and abort isolation between concurrent searches
+- `recommend()` is now covered directly: three-distinct-anime validation,
+  the no-match path, adult and missing candidates being dropped,
+  never recommending a selection, determinism across repeated calls and
+  reordered inputs, and propagation of lookup failures
+- Recommendation tests split to mirror `src/`: `similarity.test.ts`,
+  `candidates.test.ts`, `scoring.test.ts`, `reasons.test.ts` and
+  `recommend.test.ts`, sharing `fixtures.ts`. The previous
+  `recommendation.test.ts` covered four modules in one file
+- Ranking assertions now cover each tie-breaker in turn (score,
+  source count, popularity, id) plus input-order independence and
+  non-mutation
 
 ### Removed
 
