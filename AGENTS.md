@@ -54,6 +54,7 @@ or AI service. All state is in-memory.
 - Scoring weights live in `src/recommendation/config.ts` — keep them
   configurable, not hardcoded.
 - Use the `@` alias for `src/` imports in new files.
+- Do not introduce unnecessary code comments.
 
 ## Docs
 
