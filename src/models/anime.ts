@@ -62,5 +62,4 @@ export interface Recommendation {
 }
 
 export type RecommendationResult =
-  | { kind: "recommendation"; recommendation: Recommendation }
-  | { kind: "no-match" };
+  { kind: "recommendation"; recommendation: Recommendation } | { kind: "no-match" };

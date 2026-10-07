@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAnilistCache } from "../api/anilist";
-import type { Anime, CommunityRecommendation, RelatedAnime } from "../models/anime";
+import { clearAnilistCache } from "@/api/anilist";
+import type { Anime, CommunityRecommendation, RelatedAnime } from "@/models/anime";
 import { anime, relation, reversed, selectedThree } from "./fixtures";
 import { recommend } from "./recommend";
 
 const api = vi.hoisted(() => ({
-  connections: new Map<number, { relations: RelatedAnime[]; recommendations: CommunityRecommendation[] }>(),
+  connections: new Map<
+    number,
+    { relations: RelatedAnime[]; recommendations: CommunityRecommendation[] }
+  >(),
   batch: new Map<number, Anime>(),
 }));
 
@@ -67,7 +70,9 @@ describe("recommend", () => {
   it("rejects anything other than three different anime", async () => {
     await expect(recommend([])).rejects.toThrow(/3 different anime/);
     await expect(recommend([anime(1), anime(2)])).rejects.toThrow(/3 different anime/);
-    await expect(recommend([anime(1), anime(2), anime(3), anime(4)])).rejects.toThrow(/3 different anime/);
+    await expect(recommend([anime(1), anime(2), anime(3), anime(4)])).rejects.toThrow(
+      /3 different anime/,
+    );
     await expect(recommend([anime(1), anime(1), anime(2)])).rejects.toThrow(/3 different anime/);
   });
 
@@ -126,7 +131,10 @@ describe("recommend", () => {
 
   it("picks the higher scoring candidate", async () => {
     const selected = scenario([{ id: 10 }, { id: 11 }]);
-    api.batch.set(10, anime(10, { genres: [], themes: [], mainStudios: [], type: null, year: null }));
+    api.batch.set(
+      10,
+      anime(10, { genres: [], themes: [], mainStudios: [], type: null, year: null }),
+    );
     const result = await recommend(selected);
     expect(result.kind).toBe("recommendation");
     if (result.kind !== "recommendation") return;

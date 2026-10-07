@@ -1,4 +1,4 @@
-import type { Anime, Candidate } from "../models/anime";
+import type { Anime, Candidate } from "@/models/anime";
 import {
   COMMUNITY_RELATION_TYPE,
   MAX_REASON_GENRES,
@@ -6,16 +6,12 @@ import {
   MIN_SHARED_SELECTIONS,
 } from "./config";
 
-function sharedLabels(
-  candidateLabels: string[],
-  selectionLabels: string[][],
-): string[] {
+function sharedLabels(candidateLabels: string[], selectionLabels: string[][]): string[] {
   return candidateLabels.filter((label) => {
     const lowerLabel = label.toLowerCase();
     return (
-      selectionLabels.filter((labels) =>
-        labels.some((item) => item.toLowerCase() === lowerLabel),
-      ).length >= MIN_SHARED_SELECTIONS
+      selectionLabels.filter((labels) => labels.some((item) => item.toLowerCase() === lowerLabel))
+        .length >= MIN_SHARED_SELECTIONS
     );
   });
 }
@@ -32,7 +28,9 @@ export function generateReasons(candidate: Candidate, selected: Anime[]): string
     candidate.anime.genres,
     selected.map((anime) => anime.genres),
   ).slice(0, MAX_REASON_GENRES);
-  genres.forEach((genre) => reasons.push(`Shares ${genre} with at least ${MIN_SHARED_SELECTIONS} selections`));
+  genres.forEach((genre) =>
+    reasons.push(`Shares ${genre} with at least ${MIN_SHARED_SELECTIONS} selections`),
+  );
   const themes = sharedLabels(
     candidate.anime.themes,
     selected.map((anime) => anime.themes),

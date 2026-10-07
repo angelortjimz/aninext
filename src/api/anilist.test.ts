@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Anime } from "../models/anime";
+import type { Anime } from "@/models/anime";
 import {
   AnilistError,
   clearAnilistCache,
@@ -88,7 +88,10 @@ function signalAwareFetch(
   return fetchMock;
 }
 
-function requestBody(fetchMock: ReturnType<typeof vi.fn>, call = 0): {
+function requestBody(
+  fetchMock: ReturnType<typeof vi.fn>,
+  call = 0,
+): {
   query: string;
   variables: Record<string, unknown>;
 } {
@@ -133,7 +136,9 @@ describe("AniList normalization", () => {
   });
 
   it("falls back through title languages", () => {
-    expect(normalizeSearchResult({ ...media, title: { romaji: "R", native: "N" } }).title).toBe("R");
+    expect(normalizeSearchResult({ ...media, title: { romaji: "R", native: "N" } }).title).toBe(
+      "R",
+    );
     expect(normalizeSearchResult({ ...media, title: { native: "N" } }).title).toBe("N");
   });
 
@@ -177,10 +182,40 @@ describe("AniList requests", () => {
         Media: {
           relations: {
             edges: [
-              { relationType: "SIDE_STORY", node: { id: 5, idMal: 5, title: { english: "The Movie" }, format: "MOVIE", type: "ANIME" } },
-              { relationType: "ADAPTATION", node: { id: 30173, idMal: 173, title: { english: "The Manga" }, format: "MANGA", type: "MANGA" } },
-              { relationType: "SPIN_OFF", node: { id: 9, idMal: null, title: { english: "No MAL id" }, format: "TV", type: "ANIME" } },
-              { relationType: "OTHER", node: { id: 10, idMal: 10, title: { english: "Unknown type" }, format: "TV" } },
+              {
+                relationType: "SIDE_STORY",
+                node: {
+                  id: 5,
+                  idMal: 5,
+                  title: { english: "The Movie" },
+                  format: "MOVIE",
+                  type: "ANIME",
+                },
+              },
+              {
+                relationType: "ADAPTATION",
+                node: {
+                  id: 30173,
+                  idMal: 173,
+                  title: { english: "The Manga" },
+                  format: "MANGA",
+                  type: "MANGA",
+                },
+              },
+              {
+                relationType: "SPIN_OFF",
+                node: {
+                  id: 9,
+                  idMal: null,
+                  title: { english: "No MAL id" },
+                  format: "TV",
+                  type: "ANIME",
+                },
+              },
+              {
+                relationType: "OTHER",
+                node: { id: 10, idMal: 10, title: { english: "Unknown type" }, format: "TV" },
+              },
             ],
           },
           recommendations: { edges: [] },
@@ -190,7 +225,13 @@ describe("AniList requests", () => {
     const connections = await getAnimeConnections(1);
     expect(connections.relations).toEqual([
       { id: 5, title: "The Movie", mediaType: "anime", sourceId: 1, relationType: "SIDE_STORY" },
-      { id: 30173, title: "The Manga", mediaType: "manga", sourceId: 1, relationType: "ADAPTATION" },
+      {
+        id: 30173,
+        title: "The Manga",
+        mediaType: "manga",
+        sourceId: 1,
+        relationType: "ADAPTATION",
+      },
       { id: 9, title: "No MAL id", mediaType: "anime", sourceId: 1, relationType: "SPIN_OFF" },
     ]);
     expect(connections.recommendations).toEqual([]);
@@ -203,10 +244,43 @@ describe("AniList requests", () => {
           relations: { edges: [] },
           recommendations: {
             edges: [
-              { node: { rating: 42, mediaRecommendation: { id: 20, idMal: 20, title: { english: "Top Pick" }, format: "TV", type: "ANIME" } } },
-              { node: { rating: null, mediaRecommendation: { id: 21, idMal: 21, title: { english: "Unrated" }, format: "TV", type: "ANIME" } } },
+              {
+                node: {
+                  rating: 42,
+                  mediaRecommendation: {
+                    id: 20,
+                    idMal: 20,
+                    title: { english: "Top Pick" },
+                    format: "TV",
+                    type: "ANIME",
+                  },
+                },
+              },
+              {
+                node: {
+                  rating: null,
+                  mediaRecommendation: {
+                    id: 21,
+                    idMal: 21,
+                    title: { english: "Unrated" },
+                    format: "TV",
+                    type: "ANIME",
+                  },
+                },
+              },
               { node: { rating: 10, mediaRecommendation: null } },
-              { node: { rating: 5, mediaRecommendation: { id: 22, idMal: 22, title: { english: "Manga Rec" }, format: "MANGA", type: "MANGA" } } },
+              {
+                node: {
+                  rating: 5,
+                  mediaRecommendation: {
+                    id: 22,
+                    idMal: 22,
+                    title: { english: "Manga Rec" },
+                    format: "MANGA",
+                    type: "MANGA",
+                  },
+                },
+              },
             ],
           },
         },
@@ -236,7 +310,9 @@ describe("AniList requests", () => {
     const ids = Array.from({ length: 51 }, (_, index) => index + 1);
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string) as { variables: { ids: number[] } };
-      return jsonResponse({ data: { Page: { media: body.variables.ids.map((id) => ({ ...media, id })) } } });
+      return jsonResponse({
+        data: { Page: { media: body.variables.ids.map((id) => ({ ...media, id })) } },
+      });
     });
     vi.stubGlobal("fetch", fetchMock);
 

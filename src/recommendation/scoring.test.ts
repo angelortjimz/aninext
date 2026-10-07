@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
+import type { CandidateSeed } from "@/models/anime";
 import { buildCandidateSeeds } from "./candidates";
 import { SCORING_WEIGHTS } from "./config";
 import { anime, relation, selectedThree } from "./fixtures";
 import { rankCandidates, scoreCandidate } from "./scoring";
 import { metadataSimilarity } from "./similarity";
 
-function seedFor(id: number) {
-  return buildCandidateSeeds(
+function seedFor(id: number): CandidateSeed {
+  const seed = buildCandidateSeeds(
     selectedThree(),
     [[relation(1, id, "SIDE_STORY")], [], []],
     [[], [], []],
   )[0];
+  if (!seed) throw new Error(`expected a seed for ${id}`);
+  return seed;
 }
 
 describe("scoreCandidate", () => {
@@ -19,11 +22,12 @@ describe("scoreCandidate", () => {
   it("combines the relation and metadata scores with the configured weights", () => {
     const candidate = scoreCandidate(seedFor(10), anime(10), selected);
     const metadataScore =
-      selected.reduce((total, source) => total + metadataSimilarity(candidate.anime, source).total, 0) /
-      selected.length;
+      selected.reduce(
+        (total, source) => total + metadataSimilarity(candidate.anime, source).total,
+        0,
+      ) / selected.length;
     expect(candidate.finalScore).toBeCloseTo(
-      candidate.relationScore * SCORING_WEIGHTS.relation +
-        metadataScore * SCORING_WEIGHTS.metadata,
+      candidate.relationScore * SCORING_WEIGHTS.relation + metadataScore * SCORING_WEIGHTS.metadata,
       6,
     );
   });

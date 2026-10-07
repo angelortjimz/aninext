@@ -1,4 +1,4 @@
-import type { Anime } from "../models/anime";
+import type { Anime } from "@/models/anime";
 import { ERA_SIMILARITY_YEARS, SCORING_WEIGHTS } from "./config";
 
 export function jaccardSimilarity(a: string[], b: string[]): number {

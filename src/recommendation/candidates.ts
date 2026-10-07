@@ -4,12 +4,12 @@ import type {
   CandidateSeed,
   CommunityRecommendation,
   RelatedAnime,
-} from "../models/anime";
+} from "@/models/anime";
 import {
   COMMUNITY_RELATION_TYPE,
   COMMUNITY_WEIGHT,
   CANDIDATE_LIMIT,
-  ELIGIBLE_RELATION_WEIGHTS,
+  relationWeight,
 } from "./config";
 
 interface CandidateAccumulator {
@@ -37,8 +37,9 @@ export function buildCandidateSeeds(
   };
 
   relations.flat().forEach((relation) => {
-    const weight = ELIGIBLE_RELATION_WEIGHTS[relation.relationType];
-    if (weight === undefined || relation.mediaType !== "anime" || selectedIds.has(relation.id)) return;
+    const weight = relationWeight(relation.relationType);
+    if (weight === undefined || relation.mediaType !== "anime" || selectedIds.has(relation.id))
+      return;
     addCandidate(relation.id, {
       sourceId: relation.sourceId,
       relationType: relation.relationType,
@@ -62,9 +63,13 @@ export function buildCandidateSeeds(
         id,
         relations: relationsForCandidate,
         sourceCount: relationsForCandidate.length,
-        relationScore: relationsForCandidate.reduce((total, relation) => total + relation.weight, 0) / selected.length,
+        relationScore:
+          relationsForCandidate.reduce((total, relation) => total + relation.weight, 0) /
+          selected.length,
       };
     })
-    .sort((a, b) => b.relationScore - a.relationScore || b.sourceCount - a.sourceCount || a.id - b.id)
+    .sort(
+      (a, b) => b.relationScore - a.relationScore || b.sourceCount - a.sourceCount || a.id - b.id,
+    )
     .slice(0, CANDIDATE_LIMIT);
 }

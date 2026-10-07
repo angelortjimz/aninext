@@ -4,7 +4,7 @@ import type {
   AnimeSearchResult,
   CommunityRecommendation,
   RelatedAnime,
-} from "../models/anime";
+} from "@/models/anime";
 
 const BASE_URL = "https://graphql.anilist.co";
 const SEARCH_LIMIT = 5;
@@ -14,7 +14,10 @@ const RECOMMENDATION_LIMIT = 25;
 const MAX_RETRIES = 2;
 
 export class AnilistError extends Error {
-  constructor(message: string, public readonly status?: number) {
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
     super(message);
     this.name = "AnilistError";
   }
@@ -169,11 +172,15 @@ function imageUrl(media: AnilistMedia): string | null {
   return media.coverImage?.large ?? media.coverImage?.medium ?? null;
 }
 
+function isId(value: number | undefined | null): value is number {
+  return Number.isInteger(value);
+}
+
 function requiredId(media: AnilistMedia): number {
-  if (!Number.isInteger(media.id)) {
+  if (!isId(media.id)) {
     throw new AnilistError("The anime response did not include a valid identifier.");
   }
-  return media.id as number;
+  return media.id;
 }
 
 function titleOf(media: Pick<AnilistMedia, "title">): string | null {
@@ -249,8 +256,8 @@ function toRelatedAnime(
   const title = node ? titleOf(node) : null;
   const mediaType = node ? mediaTypeLabel(node) : null;
   const relationType = edge?.relationType?.trim() ?? null;
-  if (!node || !Number.isInteger(id) || !title || !mediaType || !relationType) return null;
-  return { id: id as number, title, mediaType, sourceId, relationType };
+  if (!node || !isId(id) || !title || !mediaType || !relationType) return null;
+  return { id, title, mediaType, sourceId, relationType };
 }
 
 function toCommunityRecommendation(
@@ -262,13 +269,13 @@ function toCommunityRecommendation(
   const id = media?.id;
   const title = media ? titleOf(media) : null;
   const mediaType = media ? mediaTypeLabel(media) : null;
-  if (!node || !media || !Number.isInteger(id) || !title || !mediaType) return null;
+  if (!node || !media || !isId(id) || !title || !mediaType) return null;
   return {
-    id: id as number,
+    id,
     title,
     mediaType,
     sourceId,
-    rating: Number.isFinite(node.rating) ? (node.rating as number) : 0,
+    rating: typeof node.rating === "number" && Number.isFinite(node.rating) ? node.rating : 0,
   };
 }
 
@@ -343,6 +350,7 @@ async function fetchJson<T>(
   throw new AnilistError("We could not connect to AniList. Please try again.");
 }
 
+// One map holds every response type, so reads need a cast back to the caller's T.
 const cache = new Map<string, Promise<unknown>>();
 
 // A cached promise is bound to the creating call's AbortSignal, so abortable
@@ -359,7 +367,10 @@ function cached<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): P
   return request;
 }
 
-export async function searchAnime(query: string, signal?: AbortSignal): Promise<AnimeSearchResult[]> {
+export async function searchAnime(
+  query: string,
+  signal?: AbortSignal,
+): Promise<AnimeSearchResult[]> {
   const cleanQuery = query.trim();
   if (cleanQuery.length < SEARCH_MIN_LENGTH) return [];
   const variables = { search: cleanQuery, page: 1, perPage: SEARCH_LIMIT };
@@ -369,7 +380,8 @@ export async function searchAnime(query: string, signal?: AbortSignal): Promise<
     async () => {
       const response = await fetchJson<AnilistPageResponse>(SEARCH_QUERY, variables, signal);
       const media = response.Page?.media;
-      if (!Array.isArray(media)) throw new AnilistError("AniList returned an invalid search response.");
+      if (!Array.isArray(media))
+        throw new AnilistError("AniList returned an invalid search response.");
       return media.map(normalizeSearchResult);
     },
     signal,
@@ -394,7 +406,9 @@ export function getAnimeConnections(id: number): Promise<AnimeConnections> {
     const recommendationEdges = media.recommendations?.edges ?? [];
     const recommendations = recommendationEdges
       .map((edge) => toCommunityRecommendation(edge, id))
-      .filter((recommendation): recommendation is CommunityRecommendation => recommendation !== null);
+      .filter(
+        (recommendation): recommendation is CommunityRecommendation => recommendation !== null,
+      );
     return { relations, recommendations };
   });
 }
@@ -411,7 +425,8 @@ export async function getAnimeBatch(ids: number[]): Promise<Anime[]> {
       perPage: chunk.length,
     });
     const media = response.Page?.media;
-    if (!Array.isArray(media)) throw new AnilistError("AniList returned an invalid batch response.");
+    if (!Array.isArray(media))
+      throw new AnilistError("AniList returned an invalid batch response.");
     anime.push(...media.map(normalizeAnime));
   }
   return anime;

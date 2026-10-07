@@ -79,7 +79,9 @@ describe("buildCandidateSeeds", () => {
 
   it("caps the candidate list and orders it by relation score", () => {
     const relations = [1, 2, 3].map((sourceId) =>
-      Array.from({ length: 12 }, (_, offset) => relation(sourceId, 100 + sourceId * 20 + offset, "SIDE_STORY")),
+      Array.from({ length: 12 }, (_, offset) =>
+        relation(sourceId, 100 + sourceId * 20 + offset, "SIDE_STORY"),
+      ),
     );
     const seeds = buildCandidateSeeds(selected, relations, [[], [], []]);
     expect(seeds).toHaveLength(CANDIDATE_LIMIT);

@@ -1,13 +1,6 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type JSX,
-  type KeyboardEvent,
-} from "react";
-import { SEARCH_MIN_LENGTH, searchAnime } from "../api/anilist";
-import type { AnimeSearchResult } from "../models/anime";
+import { useEffect, useRef, useState, type ChangeEvent, type JSX, type KeyboardEvent } from "react";
+import { SEARCH_MIN_LENGTH, searchAnime } from "@/api/anilist";
+import type { AnimeSearchResult } from "@/models/anime";
 import { SEARCH_DEBOUNCE_MS } from "./config";
 
 interface SearchFieldProps {
@@ -64,19 +57,23 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
       return;
     }
     setStatus("Searching...");
-    timerRef.current = window.setTimeout(async () => {
-      controllerRef.current = new AbortController();
-      try {
-        const results = await searchAnime(trimmed, controllerRef.current.signal);
-        if (queryRef.current.trim() !== trimmed) return;
-        setMatches(results);
-        setActiveIndex(results.length > 0 ? 0 : -1);
-        setStatus(results.length ? "Choose a result" : "No anime found");
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setStatus("Search is unavailable. Try again.");
-      }
+    timerRef.current = window.setTimeout(() => {
+      void runSearch(trimmed);
     }, SEARCH_DEBOUNCE_MS);
+  }
+
+  async function runSearch(trimmed: string): Promise<void> {
+    controllerRef.current = new AbortController();
+    try {
+      const results = await searchAnime(trimmed, controllerRef.current.signal);
+      if (queryRef.current.trim() !== trimmed) return;
+      setMatches(results);
+      setActiveIndex(results.length > 0 ? 0 : -1);
+      setStatus(results.length ? "Choose a result" : "No anime found");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setStatus("Search is unavailable. Try again.");
+    }
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {

@@ -1,20 +1,22 @@
 import { useState, type JSX } from "react";
-import { getAnimeBatch } from "./api/anilist";
-import type { AnimeSearchResult } from "./models/anime";
-import type { UiState } from "./models/ui";
-import { recommend } from "./recommendation/recommend";
-import { SearchField } from "./ui/SearchField";
-import { ResultRegion } from "./ui/ResultRegion";
+import { getAnimeBatch } from "@/api/anilist";
+import type { AnimeSearchResult } from "@/models/anime";
+import type { UiState } from "@/models/ui";
+import { recommend } from "@/recommendation/recommend";
+import { SearchField } from "@/ui/SearchField";
+import { ResultRegion } from "@/ui/ResultRegion";
 
 const FIELD_COUNT = 3;
 
 export function App(): JSX.Element {
-  const [selections, setSelections] = useState<(AnimeSearchResult | null)[]>(
-    () => Array<AnimeSearchResult | null>(FIELD_COUNT).fill(null),
+  const [selections, setSelections] = useState<(AnimeSearchResult | null)[]>(() =>
+    Array<AnimeSearchResult | null>(FIELD_COUNT).fill(null),
   );
   const [ui, setUi] = useState<UiState>({ kind: "idle" });
 
-  const selected = selections.filter((selection): selection is AnimeSearchResult => selection !== null);
+  const selected = selections.filter(
+    (selection): selection is AnimeSearchResult => selection !== null,
+  );
   const hasDuplicate = new Set(selected.map((item) => item.id)).size !== selected.length;
   const loading = ui.kind === "loading";
   const canSubmit = selected.length === FIELD_COUNT && !hasDuplicate && !loading;
@@ -47,12 +49,19 @@ export function App(): JSX.Element {
     }
   }
 
+  function handleSubmitClick(): void {
+    void handleSubmit();
+  }
+
   return (
     <div className="page-shell">
       <header className="masthead">
         <p className="eyebrow">Anime discovery engine</p>
         <h1>What should you watch next?</h1>
-        <p>Pick three anime you enjoyed. We will find one adjacent discovery, not the next franchise installment.</p>
+        <p>
+          Pick three anime you enjoyed. We will find one adjacent discovery, not the next franchise
+          installment.
+        </p>
       </header>
       <section className="selector" aria-labelledby="selection-title">
         <div className="section-heading">
@@ -72,7 +81,12 @@ export function App(): JSX.Element {
         <p className="selection-error" role="alert">
           {hasDuplicate ? "Please select three different anime." : ""}
         </p>
-        <button className="recommend-button" type="button" disabled={!canSubmit} onClick={handleSubmit}>
+        <button
+          className="recommend-button"
+          type="button"
+          disabled={!canSubmit}
+          onClick={handleSubmitClick}
+        >
           Find a recommendation
         </button>
       </section>

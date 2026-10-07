@@ -43,7 +43,10 @@ describe("metadataSimilarity", () => {
 
   it("returns a total bounded by the sum of the weights", () => {
     const identical = metadataSimilarity(anime(1), anime(1));
-    const unrelated = metadataSimilarity(anime(1, { genres: [], themes: [], type: null, mainStudios: [], year: null }), anime(1));
+    const unrelated = metadataSimilarity(
+      anime(1, { genres: [], themes: [], type: null, mainStudios: [], year: null }),
+      anime(1),
+    );
     expect(identical.total).toBeCloseTo(1);
     expect(unrelated.total).toBe(0);
   });

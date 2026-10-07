@@ -1,4 +1,4 @@
-import type { Anime, Candidate, CandidateSeed } from "../models/anime";
+import type { Anime, Candidate, CandidateSeed } from "@/models/anime";
 import { SCORING_WEIGHTS } from "./config";
 import { metadataSimilarity } from "./similarity";
 

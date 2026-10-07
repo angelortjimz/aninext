@@ -57,9 +57,21 @@ describe("generateReasons", () => {
         genres: ["Drama", "Mystery", "Action"],
         themes: ["Psychological", "Time Travel", "School Life"],
       }),
-      [anime(1, { genres: ["Drama", "Mystery", "Action"], themes: ["Psychological", "Time Travel", "School Life"] }), anime(2, { genres: ["Drama", "Mystery", "Action"], themes: ["Psychological", "Time Travel", "School Life"] }), anime(3)],
+      [
+        anime(1, {
+          genres: ["Drama", "Mystery", "Action"],
+          themes: ["Psychological", "Time Travel", "School Life"],
+        }),
+        anime(2, {
+          genres: ["Drama", "Mystery", "Action"],
+          themes: ["Psychological", "Time Travel", "School Life"],
+        }),
+        anime(3),
+      ],
     );
-    const genreReasons = reasons.filter((reason) => reason.startsWith("Shares ") && !reason.includes("theme"));
+    const genreReasons = reasons.filter(
+      (reason) => reason.startsWith("Shares ") && !reason.includes("theme"),
+    );
     const themeReasons = reasons.filter((reason) => reason.includes("theme"));
     expect(genreReasons).toHaveLength(MAX_REASON_GENRES);
     expect(themeReasons).toHaveLength(MAX_REASON_THEMES);
@@ -81,18 +93,20 @@ describe("generateReasons", () => {
 
   it("does not claim a community link without one", () => {
     const reasons = generateReasons(
-      candidateFrom([[relation(1, 10, "SIDE_STORY")], [], []], [[], [], []], { genres: [], themes: [] }),
+      candidateFrom([[relation(1, 10, "SIDE_STORY")], [], []], [[], [], []], {
+        genres: [],
+        themes: [],
+      }),
       selected,
     );
     expect(reasons.some((reason) => reason.includes("fans"))).toBe(false);
   });
 
   it("claims a community link when one is present", () => {
-    const candidate = candidateFrom(
-      [[], [], []],
-      [[communityRecommendation(1, 10)], [], []],
+    const candidate = candidateFrom([[], [], []], [[communityRecommendation(1, 10)], [], []]);
+    expect(candidate.relations.some((item) => item.relationType === COMMUNITY_RELATION_TYPE)).toBe(
+      true,
     );
-    expect(candidate.relations.some((item) => item.relationType === COMMUNITY_RELATION_TYPE)).toBe(true);
     expect(generateReasons(candidate, selected)).toContain(
       "Frequently recommended by fans of your selections",
     );

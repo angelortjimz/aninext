@@ -1,6 +1,6 @@
 import type { JSX } from "react";
-import type { Recommendation } from "../models/anime";
-import type { UiState } from "../models/ui";
+import type { Recommendation } from "@/models/anime";
+import type { UiState } from "@/models/ui";
 
 function details(recommendation: Recommendation): string {
   const anime = recommendation.anime;

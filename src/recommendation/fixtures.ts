@@ -1,4 +1,4 @@
-import type { Anime, CommunityRecommendation, RelatedAnime } from "../models/anime";
+import type { Anime, CommunityRecommendation, RelatedAnime } from "@/models/anime";
 
 export const anime = (id: number, overrides: Partial<Anime> = {}): Anime => ({
   id,

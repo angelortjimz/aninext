@@ -49,6 +49,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Ranking assertions now cover each tie-breaker in turn (score,
   source count, popularity, id) plus input-order independence and
   non-mutation
+- ESLint 9 (flat config, type-aware via `typescript-eslint`) and Prettier
+  as devDependencies, with `lint`, `lint:fix`, `format`,
+  `format:check`, `typecheck` and `check` scripts. `check` runs lint,
+  format, tests and build in one command
+- `tsconfig.json` gained `paths` for the `@` alias plus
+  `noUncheckedIndexedAccess`, `noImplicitOverride` and
+  `verbatimModuleSyntax`. All cross-directory imports under `src/` now
+  use `@/`
+- Config objects use `as const satisfies`, so a misspelled relation
+  weight is a compile error instead of a silent `undefined`. Lookups go
+  through the new `relationWeight()` helper, which also rejects inherited
+  object keys
+- `package.json` declares `packageManager` and `engines.node`, so the
+  pnpm-only rule is enforced by the tooling
+- The "Find a recommendation" button and the debounced search timer now
+  call their async handlers through a `void` wrapper rather than passing
+  a promise-returning function where a void return is expected
+
+### Removed
+
+- Six `as` casts in the AniList client, replaced by an `isId()` type
+  guard and explicit `typeof` checks
 
 ### Removed
 
