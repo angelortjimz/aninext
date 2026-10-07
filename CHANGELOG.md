@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- React 19 (`react`, `react-dom`) with `@vitejs/plugin-react` — the UI is
+  now component-based (`src/App.tsx`, `src/main.tsx`, `src/ui/`)
+
+### Changed
+
+- UI migrated from vanilla TypeScript DOM manipulation to React;
+  `src/ui/search.ts` and `src/ui/results.ts` replaced by
+  `src/ui/SearchField.tsx` and `src/ui/ResultRegion.tsx`, state is now
+  managed with hooks, and `escapeHtml` was dropped (React escapes by
+  default). Behavior, markup structure, and `style.css` are unchanged
+
+### Removed
+
+- `src/main.ts` — replaced by `src/main.tsx` as the Vite entry point
+  (`index.html` updated accordingly)
+
+### Added
+
 - `AGENTS.md` — instructions and restrictions for AI coding agents
   (pnpm-only workflow, deterministic recommendations, zero runtime deps)
 - Community recommendations from AniList (`Media.recommendations`, sorted
