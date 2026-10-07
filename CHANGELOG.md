@@ -39,6 +39,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   eviction on failure, batch splitting above the AniList page limit,
   and abort isolation between concurrent searches
 
+### Removed
+
+- `getAnime()` and its dedicated `MEDIA_QUERY`. The app only ever
+  fetched single anime through `getAnimeBatch`; nothing in `src/` called
+  it outside tests
+- Unused fields on the domain model that were populated but never read:
+  `Anime.malId`, `Anime.studios`, and the six per-dimension score fields
+  on `Candidate` (`genreScore`, `themeScore`, `typeScore`,
+  `studioScore`, `eraScore`, `metadataScore`)
+- `CandidateSeed.title`, which was carried through scoring but never
+  displayed; `anime.title` is used instead
+
+### Changed
+
+- Studio lookups now ask AniList for main studios directly
+  (`studios(isMain: true)`) rather than fetching every studio and
+  filtering on `isMain` client-side
+- Recommendation hydration builds scored `Candidate`s directly instead of
+  returning `{ seed, anime }` tuples for a second mapping pass
+- `recommend()` no longer mutates the winning candidate to attach reasons;
+  reasons are computed into the returned recommendation
+
 ### Added
 
 - React 19 (`react`, `react-dom`) with `@vitejs/plugin-react` — the UI is

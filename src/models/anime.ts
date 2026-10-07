@@ -1,6 +1,5 @@
 export interface AnimeSearchResult {
   id: number;
-  malId: number | null;
   title: string;
   imageUrl: string | null;
   type: string | null;
@@ -11,7 +10,6 @@ export interface AnimeSearchResult {
 export interface Anime extends AnimeSearchResult {
   genres: string[];
   themes: string[];
-  studios: string[];
   mainStudios: string[];
   popularity: number;
   isAdult: boolean;
@@ -46,7 +44,6 @@ export interface CandidateRelation {
 
 export interface CandidateSeed {
   id: number;
-  title: string;
   relations: CandidateRelation[];
   sourceCount: number;
   relationScore: number;
@@ -54,12 +51,6 @@ export interface CandidateSeed {
 
 export interface Candidate extends CandidateSeed {
   anime: Anime;
-  genreScore: number;
-  themeScore: number;
-  typeScore: number;
-  studioScore: number;
-  eraScore: number;
-  metadataScore: number;
   finalScore: number;
   reasons: string[];
 }

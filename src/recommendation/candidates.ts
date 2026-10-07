@@ -13,7 +13,6 @@ import {
 } from "./config";
 
 interface CandidateAccumulator {
-  title: string;
   bySource: Map<number, CandidateRelation>;
 }
 
@@ -25,19 +24,22 @@ export function buildCandidateSeeds(
   const selectedIds = new Set(selected.map((anime) => anime.id));
   const candidates = new Map<number, CandidateAccumulator>();
 
-  const addCandidate = (id: number, title: string, relation: CandidateRelation): void => {
-    const candidate = candidates.get(id) ?? { title, bySource: new Map<number, CandidateRelation>() };
-    const existing = candidate.bySource.get(relation.sourceId);
-    if (!existing || relation.weight > existing.weight) {
-      candidate.bySource.set(relation.sourceId, relation);
+  const addCandidate = (id: number, relation: CandidateRelation): void => {
+    const existing = candidates.get(id);
+    if (!existing) {
+      candidates.set(id, { bySource: new Map([[relation.sourceId, relation]]) });
+      return;
     }
-    candidates.set(id, candidate);
+    const current = existing.bySource.get(relation.sourceId);
+    if (!current || relation.weight > current.weight) {
+      existing.bySource.set(relation.sourceId, relation);
+    }
   };
 
   relations.flat().forEach((relation) => {
     const weight = ELIGIBLE_RELATION_WEIGHTS[relation.relationType];
     if (weight === undefined || relation.mediaType !== "anime" || selectedIds.has(relation.id)) return;
-    addCandidate(relation.id, relation.title, {
+    addCandidate(relation.id, {
       sourceId: relation.sourceId,
       relationType: relation.relationType,
       weight,
@@ -46,7 +48,7 @@ export function buildCandidateSeeds(
 
   recommendations.flat().forEach((recommendation) => {
     if (recommendation.mediaType !== "anime" || selectedIds.has(recommendation.id)) return;
-    addCandidate(recommendation.id, recommendation.title, {
+    addCandidate(recommendation.id, {
       sourceId: recommendation.sourceId,
       relationType: COMMUNITY_RELATION_TYPE,
       weight: COMMUNITY_WEIGHT,
@@ -58,7 +60,6 @@ export function buildCandidateSeeds(
       const relationsForCandidate = [...candidate.bySource.values()];
       return {
         id,
-        title: candidate.title,
         relations: relationsForCandidate,
         sourceCount: relationsForCandidate.length,
         relationScore: relationsForCandidate.reduce((total, relation) => total + relation.weight, 0) / selected.length,

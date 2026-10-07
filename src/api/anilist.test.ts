@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Anime } from "../models/anime";
 import {
   AnilistError,
   clearAnilistCache,
-  getAnime,
   getAnimeBatch,
   getAnimeConnections,
   normalizeAnime,
@@ -25,7 +25,6 @@ afterEach(() => {
 
 const media = {
   id: 1,
-  idMal: 1,
   title: { romaji: "Cowboy Bebop", english: "Cowboy Bebop", native: "カウボーイビバップ" },
   format: "TV",
   seasonYear: 1998,
@@ -36,7 +35,7 @@ const media = {
     { name: "Philosophy", category: "Theme-Other" },
     { name: "Ensemble Cast", category: "Cast-Main Cast" },
   ],
-  studios: { edges: [{ isMain: true, node: { name: "Sunrise" } }] },
+  studios: { edges: [{ node: { name: "Sunrise" } }] },
   coverImage: { large: "cover.jpg" },
   isAdult: false,
   popularity: 1000,
@@ -103,11 +102,18 @@ function abortError(): DOMException {
   return new DOMException("The request was cancelled.", "AbortError");
 }
 
+/** `getAnime` was removed in favour of the batch endpoint; this keeps the
+ * single-anime tests readable. */
+async function loadAnime(id: number): Promise<Anime> {
+  const [anime] = await getAnimeBatch([id]);
+  if (!anime) throw new AnilistError(`AniList returned no details for ${id}.`);
+  return anime;
+}
+
 describe("AniList normalization", () => {
   it("keeps the application model narrow", () => {
-    expect(normalizeSearchResult(media)).toMatchObject({
+    expect(normalizeSearchResult(media)).toEqual({
       id: 1,
-      malId: 1,
       title: "Cowboy Bebop",
       imageUrl: "cover.jpg",
       type: "TV",
@@ -118,7 +124,6 @@ describe("AniList normalization", () => {
       id: 1,
       genres: ["Sci-Fi"],
       themes: ["Space", "Philosophy"],
-      studios: ["Sunrise"],
       mainStudios: ["Sunrise"],
       popularity: 1000,
       isAdult: false,
@@ -135,24 +140,17 @@ describe("AniList normalization", () => {
     expect(normalizeSearchResult({ ...media, title: { native: "N" } }).title).toBe("N");
   });
 
-  it("keeps titles without a MAL id and ignores non-main studios", () => {
-    expect(normalizeSearchResult({ ...media, idMal: null }).malId).toBeNull();
+  it("drops blank and unnamed studio edges", () => {
     const candidate = normalizeAnime({
       ...media,
-      studios: {
-        edges: [
-          { isMain: true, node: { name: "Sunrise" } },
-          { isMain: false, node: { name: "Other" } },
-        ],
-      },
+      studios: { edges: [{ node: { name: "Sunrise" } }, { node: { name: "   " } }, {}, null] },
     });
-    expect(candidate.studios).toEqual(["Sunrise", "Other"]);
     expect(candidate.mainStudios).toEqual(["Sunrise"]);
   });
 
-  it("throws a typed error when required fields are missing", async () => {
-    stubFetch(dataResponse({ Media: null }));
-    await expect(getAnime(1)).rejects.toThrow(AnilistError);
+  it("throws a typed error when required fields are missing", () => {
+    expect(() => normalizeSearchResult({ ...media, id: undefined })).toThrow(AnilistError);
+    expect(() => normalizeSearchResult({ ...media, title: {} })).toThrow(AnilistError);
   });
 });
 
@@ -261,48 +259,48 @@ describe("AniList requests", () => {
 
   it("surfaces GraphQL errors returned with a 200 response", async () => {
     stubFetch(jsonResponse({ data: null, errors: [{ message: "Not Found.", status: 404 }] }));
-    await expect(getAnime(999999999)).rejects.toThrow(AnilistError);
+    await expect(loadAnime(999999999)).rejects.toThrow(AnilistError);
   });
 
   it("does not retry a client error", async () => {
     const fetchMock = stubFetch(errorResponse(404));
-    await expect(getAnime(1)).rejects.toThrow(AnilistError);
+    await expect(loadAnime(1)).rejects.toThrow(AnilistError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("retries transient failures", async () => {
     const fetchMock = stubFetch(
       errorResponse(429, { "Retry-After": "0" }),
-      dataResponse({ Media: { ...media } }),
+      dataResponse({ Page: { media: [{ ...media }] } }),
     );
-    const anime = await getAnime(1);
+    const anime = await loadAnime(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(anime.id).toBe(1);
   });
 
   it("gives up with a friendly error once retries are exhausted", async () => {
     const fetchMock = stubFetch(errorResponse(429, { "Retry-After": "0" }));
-    await expect(getAnime(1)).rejects.toThrow(AnilistError);
+    await expect(loadAnime(1)).rejects.toThrow(AnilistError);
     // One initial attempt plus MAX_RETRIES (2) retries.
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("never surfaces the raw API error text to callers", async () => {
     stubFetch(errorResponse(404));
-    await expect(getAnime(1)).rejects.toThrow(/AniList could not retrieve this anime/);
+    await expect(loadAnime(1)).rejects.toThrow(/AniList could not retrieve this anime/);
   });
 
   it("drops a failed request from the cache so the next call retries", async () => {
     vi.useFakeTimers();
     const failing = vi.fn(async () => errorResponse(503));
     vi.stubGlobal("fetch", failing);
-    const failed = getAnime(1).catch(() => undefined);
+    const failed = loadAnime(1).catch(() => undefined);
     await vi.advanceTimersByTimeAsync(1500);
     await failed;
     expect(failing).toHaveBeenCalledTimes(3);
 
-    const succeeding = stubFetch(dataResponse({ Media: { ...media } }));
-    expect((await getAnime(1)).id).toBe(1);
+    const succeeding = stubFetch(dataResponse({ Page: { media: [{ ...media }] } }));
+    expect((await loadAnime(1)).id).toBe(1);
     expect(succeeding).toHaveBeenCalledTimes(1);
   });
 });
@@ -313,7 +311,7 @@ describe("AniList retry backoff", () => {
     const fetchMock = vi.fn(async () => errorResponse(503));
     vi.stubGlobal("fetch", fetchMock);
 
-    const outcome = getAnime(1).then(
+    const outcome = loadAnime(1).then(
       (value) => ({ ok: true, value }),
       (error: unknown) => ({ ok: false, error }),
     );
@@ -345,7 +343,7 @@ describe("AniList retry backoff", () => {
     const fetchMock = vi.fn(async () => errorResponse(503));
     vi.stubGlobal("fetch", fetchMock);
 
-    const outcome = getAnime(1).catch(() => undefined);
+    const outcome = loadAnime(1).catch(() => undefined);
 
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -366,10 +364,10 @@ describe("AniList retry backoff", () => {
     vi.useFakeTimers();
     const fetchMock = stubFetch(
       errorResponse(429, { "Retry-After": "2" }),
-      dataResponse({ Media: { ...media } }),
+      dataResponse({ Page: { media: [{ ...media }] } }),
     );
 
-    const pending = getAnime(1);
+    const pending = loadAnime(1);
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -386,10 +384,10 @@ describe("AniList retry backoff", () => {
     vi.useFakeTimers();
     const fetchMock = stubFetch(
       errorResponse(429, { "Retry-After": "soon" }),
-      dataResponse({ Media: { ...media } }),
+      dataResponse({ Page: { media: [{ ...media }] } }),
     );
 
-    const pending = getAnime(1);
+    const pending = loadAnime(1);
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(499);
     expect(fetchMock).toHaveBeenCalledTimes(1);

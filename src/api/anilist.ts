@@ -40,7 +40,6 @@ interface AnilistStudio {
 }
 
 interface AnilistStudioEdge {
-  isMain?: boolean | null;
   node?: AnilistStudio | null;
 }
 
@@ -51,7 +50,6 @@ interface AnilistRecommendationNode {
 
 interface AnilistMedia {
   id?: number;
-  idMal?: number | null;
   title?: AnilistTitle;
   format?: string | null;
   seasonYear?: number | null;
@@ -94,32 +92,12 @@ const SEARCH_QUERY = `
     Page(page: $page, perPage: $perPage) {
       media(search: $search, type: ANIME, isAdult: false) {
         id
-        idMal
         title { romaji english native }
         format
         seasonYear
         episodes
         coverImage { large medium }
       }
-    }
-  }
-`;
-
-const MEDIA_QUERY = `
-  query ($id: Int) {
-    Media(id: $id) {
-      id
-      idMal
-      title { romaji english native }
-      format
-      seasonYear
-      episodes
-      genres
-      tags { name category }
-      studios { edges { isMain node { name } } }
-      coverImage { large medium }
-      isAdult
-      popularity
     }
   }
 `;
@@ -132,7 +110,6 @@ const CONNECTIONS_QUERY = `
           relationType
           node {
             id
-            idMal
             title { romaji english native }
             format
             type
@@ -145,7 +122,6 @@ const CONNECTIONS_QUERY = `
             rating
             mediaRecommendation {
               id
-              idMal
               title { romaji english native }
               format
               type
@@ -162,14 +138,13 @@ const BATCH_QUERY = `
     Page(page: $page, perPage: $perPage) {
       media(id_in: $ids, type: ANIME, isAdult: false) {
         id
-        idMal
         title { romaji english native }
         format
         seasonYear
         episodes
         genres
         tags { name category }
-        studios { edges { isMain node { name } } }
+        studios(isMain: true) { edges { node { name } } }
         coverImage { large medium }
         isAdult
         popularity
@@ -205,10 +180,6 @@ function requiredId(media: AnilistMedia): number {
   return media.id as number;
 }
 
-function optionalMalId(media: AnilistMedia): number | null {
-  return Number.isInteger(media.idMal) ? (media.idMal as number) : null;
-}
-
 function titleOf(media: Pick<AnilistMedia, "title">): string | null {
   const title = [media.title?.english, media.title?.romaji, media.title?.native].find((value) =>
     value?.trim(),
@@ -230,16 +201,11 @@ function formatLabel(media: Pick<AnilistMedia, "format">): string | null {
   return FORMAT_LABELS[format] ?? format.replace(/_/g, " ");
 }
 
-function studios(media: AnilistMedia): string[] {
-  return (media.studios?.edges ?? []).flatMap((edge) => {
-    const name = edge?.node?.name?.trim();
-    return name ? [name] : [];
-  });
-}
-
+// The queries request `studios(isMain: true)`, so every edge returned is already
+// a main studio and no client-side `isMain` filtering is needed.
 function mainStudios(media: AnilistMedia): string[] {
   return (media.studios?.edges ?? []).flatMap((edge) => {
-    const name = edge?.isMain === true ? edge.node?.name?.trim() : undefined;
+    const name = edge?.node?.name?.trim();
     return name ? [name] : [];
   });
 }
@@ -261,7 +227,6 @@ function mediaTypeLabel(media: AnilistMedia): string | null {
 export function normalizeSearchResult(media: AnilistMedia): AnimeSearchResult {
   return {
     id: requiredId(media),
-    malId: optionalMalId(media),
     title: requiredTitle(media),
     imageUrl: imageUrl(media),
     type: formatLabel(media),
@@ -275,7 +240,6 @@ export function normalizeAnime(media: AnilistMedia): Anime {
     ...normalizeSearchResult(media),
     genres: genres(media),
     themes: themes(media),
-    studios: studios(media),
     mainStudios: mainStudios(media),
     popularity: media.popularity ?? 0,
     isAdult: media.isAdult ?? false,
@@ -415,15 +379,6 @@ export async function searchAnime(query: string, signal?: AbortSignal): Promise<
     },
     signal,
   );
-}
-
-export function getAnime(id: number): Promise<Anime> {
-  return cached(`media:${id}`, async () => {
-    const response = await fetchJson<AnilistMediaResponse>(MEDIA_QUERY, { id });
-    const media = response.Media;
-    if (!media) throw new AnilistError("AniList returned no anime details.");
-    return normalizeAnime(media);
-  });
 }
 
 export function getAnimeConnections(id: number): Promise<AnimeConnections> {

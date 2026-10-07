@@ -4,19 +4,13 @@ import { metadataSimilarity } from "./similarity";
 
 export function scoreCandidate(seed: CandidateSeed, anime: Anime, selected: Anime[]): Candidate {
   const comparisons = selected.map((source) => metadataSimilarity(anime, source));
-  const average = (field: "genre" | "theme" | "type" | "studio" | "era" | "total") =>
-    comparisons.reduce((total, score) => total + score[field], 0) / comparisons.length;
-  const metadataScore = average("total");
+  const metadataScore =
+    comparisons.reduce((total, score) => total + score.total, 0) / comparisons.length;
   return {
     ...seed,
     anime,
-    genreScore: average("genre"),
-    themeScore: average("theme"),
-    typeScore: average("type"),
-    studioScore: average("studio"),
-    eraScore: average("era"),
-    metadataScore,
-    finalScore: seed.relationScore * SCORING_WEIGHTS.relation + metadataScore * SCORING_WEIGHTS.metadata,
+    finalScore:
+      seed.relationScore * SCORING_WEIGHTS.relation + metadataScore * SCORING_WEIGHTS.metadata,
     reasons: [],
   };
 }

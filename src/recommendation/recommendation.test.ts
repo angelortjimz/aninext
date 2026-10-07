@@ -3,11 +3,10 @@ import type { Anime, CommunityRecommendation, RelatedAnime } from "../models/ani
 import { buildCandidateSeeds } from "./candidates";
 import { generateReasons } from "./reasons";
 import { rankCandidates, scoreCandidate } from "./scoring";
-import { eraSimilarity, jaccardSimilarity, typeSimilarity } from "./similarity";
+import { eraSimilarity, jaccardSimilarity, metadataSimilarity, typeSimilarity } from "./similarity";
 
 const anime = (id: number, overrides: Partial<Anime> = {}): Anime => ({
   id,
-  malId: id,
   title: `Anime ${id}`,
   imageUrl: null,
   type: "TV",
@@ -15,7 +14,6 @@ const anime = (id: number, overrides: Partial<Anime> = {}): Anime => ({
   episodes: 12,
   genres: ["Drama", "Mystery"],
   themes: ["Psychological"],
-  studios: ["Studio A"],
   mainStudios: ["Studio A"],
   popularity: 100,
   isAdult: false,
@@ -43,10 +41,15 @@ describe("similarity", () => {
     expect(eraSimilarity(anime(1), anime(2, { year: null }))).toBe(0);
   });
 
-  it("compares main studios only", () => {
-    const candidate = anime(10, { studios: ["Studio A", "Studio B"], mainStudios: ["Studio B"] });
-    expect(jaccardSimilarity(candidate.mainStudios, anime(1).mainStudios)).toBe(0);
-    expect(jaccardSimilarity(anime(1).mainStudios, anime(1).mainStudios)).toBe(1);
+  it("scores studio similarity from main studios", () => {
+    const source = anime(1);
+    const sameStudio = metadataSimilarity(anime(10), source);
+    const differentStudio = metadataSimilarity(
+      anime(10, { mainStudios: ["Studio B"] }),
+      source,
+    );
+    expect(sameStudio.studio).toBe(1);
+    expect(differentStudio.studio).toBe(0);
   });
 });
 
