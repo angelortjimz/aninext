@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [react()],
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // Deliberately not enabled: the suite imports `describe`/`it` from
+    // "vitest" explicitly, and each component test opts into jsdom with a
+    // `@vitest-environment` docblock so the pure-logic suite stays in node.
+    globals: false,
+    setupFiles: ["src/test/setup.ts"],
   },
   resolve: {
     alias: {

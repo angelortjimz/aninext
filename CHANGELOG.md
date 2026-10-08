@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Component tests for `App`, `SearchField` and `ResultRegion`, covering
+  the selection state machine, every `UiState` branch, search debouncing
+  and abort isolation, stale-response rejection, combobox keyboard
+  navigation with wrap-around, and combobox ARIA wiring
+- `@testing-library/react` and `jsdom` as devDependencies; component
+  tests opt into a `jsdom` environment per file so the pure-logic suite
+  keeps running in `node`
 - A design-token layer for colour, type scale, spacing and layout
   constants, consumed through `var()` so no raw hex or magic number
   remains in the component rules
