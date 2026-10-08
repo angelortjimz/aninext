@@ -33,6 +33,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The test suite was consolidated from 126 to 94 cases. Redundant
+  restatements were folded into the test that already made the same
+  claim — the four ways of reaching `no-match`, the adult/vanished/
+  repeated candidate filters, the retry-backoff header cases, and the
+  re-roll button states asserted identically in both `App` and
+  `ResultRegion` — and two vacuous tests were dropped (a pure function
+  called twice, and assertions already covered by `App`). No behaviour
+  lost its coverage; the `anilist` retry-exhaustion test moved onto fake
+  timers, cutting that file from 1053ms to 37ms
 - Changing any of the three selections now clears a shown
   recommendation. The card was scored against the previous three, so it
   no longer applied

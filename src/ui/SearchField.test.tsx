@@ -45,6 +45,12 @@ function activeOptionText(): string {
   return screen.getByRole("listbox").querySelector(".is-active")?.textContent ?? "";
 }
 
+/** Types `query` and waits for the debounced matches to render. */
+async function search(input: HTMLInputElement, query: string): Promise<void> {
+  type(input, query);
+  await settle();
+}
+
 beforeEach(() => {
   api.search.mockReset();
   api.search.mockResolvedValue([]);
@@ -65,7 +71,7 @@ describe("SearchField", () => {
     expect(screen.getByText("Enter at least 2 characters")).toBeDefined();
   });
 
-  it("coalesces a burst of keystrokes into a single debounced search", async () => {
+  it("coalesces a burst of keystrokes and searches again after a further pause", async () => {
     const { input } = renderField();
     type(input, "b");
     type(input, "be");
@@ -75,39 +81,34 @@ describe("SearchField", () => {
     await settle();
     expect(api.search).toHaveBeenCalledTimes(1);
     expect(api.search.mock.calls[0]?.[0]).toBe("bebop");
-  });
 
-  it("searches again after a further pause", async () => {
-    const { input } = renderField();
-    type(input, "bebop");
-    await settle();
-    type(input, "trigun");
-    await settle();
+    await search(input, "trigun");
     expect(api.search).toHaveBeenCalledTimes(2);
+    expect(api.search.mock.calls[1]?.[0]).toBe("trigun");
   });
 
-  it("surfaces a friendly message when the search fails", async () => {
+  it("reports a failed search but stays quiet about an abort", async () => {
     api.search.mockRejectedValue(new Error("network down"));
-    const { input } = renderField();
-    type(input, "bebop");
-    await settle();
+    const failed = renderField();
+    await search(failed.input, "bebop");
     expect(screen.getByText("Search is unavailable. Try again.")).toBeDefined();
-  });
 
-  it("swallows an aborted request instead of reporting failure", async () => {
+    cleanup();
+
     api.search.mockRejectedValue(new DOMException("aborted", "AbortError"));
-    const { input } = renderField();
-    type(input, "bebop");
-    await settle();
+    const aborted = renderField();
+    await search(aborted.input, "bebop");
     expect(screen.queryByText("Search is unavailable. Try again.")).toBeNull();
   });
 
-  it("reports when nothing matched", async () => {
-    api.search.mockResolvedValue([]);
-    const { input } = renderField();
-    type(input, "zzzz");
-    await settle();
+  it("reports no match and ignores Enter while there is nothing to pick", async () => {
+    const { onSelectionChange, input } = renderField();
+    await search(input, "zzzz");
     expect(screen.getByText("No anime found")).toBeDefined();
+
+    onSelectionChange.mockClear();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
   it("discards a stale response that resolves after newer input", async () => {
@@ -117,10 +118,8 @@ describe("SearchField", () => {
     );
 
     const { input } = renderField();
-    type(input, "bebop");
-    await settle();
-    type(input, "bebops");
-    await settle();
+    await search(input, "bebop");
+    await search(input, "bebops");
 
     // Resolve the newer request first, then let the older one land late.
     await act(async () => {
@@ -135,11 +134,10 @@ describe("SearchField", () => {
     expect(screen.getByText("Newest")).toBeDefined();
   });
 
-  it("activates the first result by default and wraps at both ends", async () => {
+  it("wraps at both ends of the list but not through the middle", async () => {
     api.search.mockResolvedValue([result(1), result(2), result(3)]);
     const { input } = renderField();
-    type(input, "bebop");
-    await settle();
+    await search(input, "bebop");
 
     expect(activeOptionText()).toContain("Anime 1");
 
@@ -148,17 +146,6 @@ describe("SearchField", () => {
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
     expect(activeOptionText()).toContain("Anime 1");
-
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-    expect(activeOptionText()).toContain("Anime 3");
-  });
-
-  it("steps backwards through the list without wrapping mid-list", async () => {
-    api.search.mockResolvedValue([result(1), result(2), result(3)]);
-    const { input } = renderField();
-    type(input, "bebop");
-    await settle();
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "ArrowDown" });
@@ -171,8 +158,7 @@ describe("SearchField", () => {
   it("selects the active result on Enter and locks the field", async () => {
     api.search.mockResolvedValue([result(1, { title: "Cowboy Bebop" })]);
     const { onSelectionChange, input } = renderField();
-    type(input, "bebop");
-    await settle();
+    await search(input, "bebop");
 
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onSelectionChange).toHaveBeenCalledWith(
@@ -184,21 +170,10 @@ describe("SearchField", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
   });
 
-  it("ignores Enter when no result is active", async () => {
-    const { onSelectionChange, input } = renderField();
-    type(input, "zzzz");
-    await settle();
-    onSelectionChange.mockClear();
-
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(onSelectionChange).not.toHaveBeenCalled();
-  });
-
   it("selects a result by clicking it", async () => {
     api.search.mockResolvedValue([result(1, { title: "Trigun" })]);
     const { onSelectionChange, input } = renderField();
-    type(input, "trigun");
-    await settle();
+    await search(input, "trigun");
     onSelectionChange.mockClear();
 
     fireEvent.click(screen.getByRole("option", { name: /Trigun/ }).querySelector("button")!);
@@ -208,8 +183,7 @@ describe("SearchField", () => {
   it("dismisses the list on Escape without selecting", async () => {
     api.search.mockResolvedValue([result(1)]);
     const { onSelectionChange, input } = renderField();
-    type(input, "bebop");
-    await settle();
+    await search(input, "bebop");
     onSelectionChange.mockClear();
 
     fireEvent.keyDown(input, { key: "Escape" });
@@ -218,12 +192,14 @@ describe("SearchField", () => {
     expect(input.readOnly).toBe(false);
   });
 
-  it("clears the selection, refocuses and reports no selection", async () => {
+  it("reveals Clear only once selected, and clearing reports no selection", async () => {
     api.search.mockResolvedValue([result(1, { title: "Nadia" })]);
     const { onSelectionChange, input } = renderField();
-    type(input, "nadia");
-    await settle();
+    expect(screen.queryByRole("button", { name: "Clear Anime 1" })).toBeNull();
+
+    await search(input, "nadia");
     fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("button", { name: "Clear Anime 1" })).toBeDefined();
     onSelectionChange.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear Anime 1" }));
@@ -231,27 +207,9 @@ describe("SearchField", () => {
     expect(input.readOnly).toBe(false);
     expect(document.activeElement).toBe(input);
     expect(onSelectionChange).toHaveBeenCalledWith(null);
-  });
 
-  it("hides the Clear button until something is selected", async () => {
-    api.search.mockResolvedValue([result(1, { title: "Nadia" })]);
-    const { input } = renderField();
-    expect(screen.queryByRole("button", { name: "Clear Anime 1" })).toBeNull();
-
-    type(input, "nadia");
-    await settle();
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(screen.getByRole("button", { name: "Clear Anime 1" })).toBeDefined();
-  });
-
-  it("editing after a selection reports a null selection", async () => {
-    api.search.mockResolvedValue([result(1, { title: "Nadia" })]);
-    const { onSelectionChange, input } = renderField();
-    type(input, "nadia");
-    await settle();
-    fireEvent.keyDown(input, { key: "Enter" });
-
-    input.readOnly = false;
+    // Editing an existing selection must also report no selection.
+    onSelectionChange.mockClear();
     type(input, "nadi");
     expect(onSelectionChange).toHaveBeenCalledWith(null);
   });
@@ -262,8 +220,7 @@ describe("SearchField", () => {
     expect(input.getAttribute("aria-expanded")).toBe("false");
     expect(input.getAttribute("aria-controls")).toBeNull();
 
-    type(input, "ab");
-    await settle();
+    await search(input, "ab");
 
     expect(input.getAttribute("aria-expanded")).toBe("true");
     expect(input.getAttribute("aria-controls")).toBe("anime-results-1");
@@ -279,23 +236,12 @@ describe("SearchField", () => {
       result(2, { title: "NoArt", imageUrl: null }),
     ]);
     const { input } = renderField();
-    type(input, "ab");
-    await settle();
+    await search(input, "ab");
 
     const withArt = screen.getByRole("option", { name: /WithArt/ });
     const noArt = screen.getByRole("option", { name: /NoArt/ });
     expect(withArt.querySelector("img")?.getAttribute("src")).toBe("https://img.example/a.jpg");
     expect(noArt.querySelector("img")).toBeNull();
     expect(noArt.querySelector(".suggestion-thumb")).not.toBeNull();
-  });
-
-  it("cannot be edited while the parent disables it", () => {
-    render(<SearchField index={1} disabled onSelectionChange={vi.fn()} />);
-    expect(combobox().disabled).toBe(true);
-  });
-
-  it("labels the field so it is reachable by accessible name", () => {
-    renderField();
-    expect(screen.getByLabelText("Anime 1")).toBeDefined();
   });
 });

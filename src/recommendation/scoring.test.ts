@@ -51,13 +51,6 @@ describe("scoreCandidate", () => {
     );
     expect(close.finalScore).toBeGreaterThan(distant.finalScore);
   });
-
-  it("is deterministic for identical inputs", () => {
-    const seed = seedFor(10);
-    const a = scoreCandidate(seed, anime(10), selected);
-    const b = scoreCandidate(seed, anime(10), selected);
-    expect(a.finalScore).toBe(b.finalScore);
-  });
 });
 
 describe("rankCandidates", () => {
@@ -69,16 +62,19 @@ describe("rankCandidates", () => {
     expect(rankCandidates([second, first]).map((candidate) => candidate.id)).toEqual([10, 11]);
   });
 
-  it("breaks equal scores by popularity", () => {
-    const first = scoreCandidate(seedFor(10), anime(10, { popularity: 100 }), selected);
-    const second = scoreCandidate(seedFor(11), anime(11, { popularity: 900 }), selected);
-    expect(rankCandidates([second, first]).map((candidate) => candidate.id)).toEqual([11, 10]);
-  });
+  it("breaks equal scores by popularity, then by id", () => {
+    // Identical metadata and relation scores, so only the tie-breakers separate them.
+    const byScore = rankCandidates([
+      scoreCandidate(seedFor(10), anime(10), selected),
+      scoreCandidate(seedFor(11), anime(11, { popularity: 900 }), selected),
+    ]).map((candidate) => candidate.id);
+    expect(byScore).toEqual([11, 10]);
 
-  it("breaks equal scores and popularity by id", () => {
-    const first = scoreCandidate(seedFor(10), anime(10, { popularity: 100 }), selected);
-    const second = scoreCandidate(seedFor(11), anime(11, { popularity: 100 }), selected);
-    expect(rankCandidates([second, first]).map((candidate) => candidate.id)).toEqual([10, 11]);
+    const byId = rankCandidates([
+      scoreCandidate(seedFor(10), anime(10), selected),
+      scoreCandidate(seedFor(11), anime(11), selected),
+    ]).map((candidate) => candidate.id);
+    expect(byId).toEqual([10, 11]);
   });
 
   it("is order-independent", () => {

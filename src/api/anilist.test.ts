@@ -130,12 +130,9 @@ describe("AniList normalization", () => {
     });
   });
 
-  it("maps AniList format casing to display labels", () => {
+  it("maps format casing and falls back through title languages", () => {
     expect(normalizeSearchResult({ ...media, format: "MOVIE" }).type).toBe("Movie");
     expect(normalizeSearchResult({ ...media, format: "TV_SHORT" }).type).toBe("TV Short");
-  });
-
-  it("falls back through title languages", () => {
     expect(normalizeSearchResult({ ...media, title: { romaji: "R", native: "N" } }).title).toBe(
       "R",
     );
@@ -157,9 +154,9 @@ describe("AniList normalization", () => {
 });
 
 describe("AniList requests", () => {
-  it("caches identical searches and keeps them SFW", async () => {
+  it("deduplicates identical searches and keeps them SFW", async () => {
     const fetchMock = stubFetch(dataResponse({ Page: { media: [media] } }));
-    await Promise.all([searchAnime("Cowboy"), searchAnime("Cowboy")]);
+    await Promise.all([searchAnime("Cowboy"), searchAnime("Cowboy"), searchAnime("Cowboy")]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://graphql.anilist.co");
@@ -169,10 +166,11 @@ describe("AniList requests", () => {
     expect(body.variables).toMatchObject({ search: "Cowboy", perPage: 5 });
   });
 
-  it("skips the request for queries shorter than two characters", async () => {
+  it("makes no request for degenerate input", async () => {
     const fetchMock = stubFetch();
     expect(await searchAnime("a")).toEqual([]);
     expect(await searchAnime("   ")).toEqual([]);
+    expect(await getAnimeBatch([])).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -294,7 +292,7 @@ describe("AniList requests", () => {
     ]);
   });
 
-  it("fetches multiple anime in one batched request", async () => {
+  it("fetches multiple anime in one deduplicated batched request", async () => {
     const fetchMock = stubFetch(
       dataResponse({ Page: { media: [media, { ...media, id: 2, idMal: 2 }] } }),
     );
@@ -324,24 +322,24 @@ describe("AniList requests", () => {
     expect(anime.map((item) => item.id)).toEqual(ids);
   });
 
-  it("returns an empty batch without requesting", async () => {
-    const fetchMock = stubFetch();
-    expect(await getAnimeBatch([])).toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("treats a 404 as terminal and never leaks the raw API text", async () => {
+    // A plain HTTP error body...
+    const httpFailure = stubFetch(errorResponse(404));
+    await expect(loadAnime(1)).rejects.toThrow(/AniList could not retrieve this anime/);
+    expect(httpFailure).toHaveBeenCalledTimes(1);
+
+    // ...and a GraphQL error delivered with a 200 both mean "stop immediately".
+    const graphqlFailure = stubFetch(
+      jsonResponse({ data: null, errors: [{ message: "Not Found.", status: 404 }] }),
+    );
+    const error = await loadAnime(999999999).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(AnilistError);
+    expect((error as AnilistError).message).toMatch(/AniList could not retrieve this anime/);
+    expect((error as AnilistError).message).not.toContain("Not Found.");
+    expect(graphqlFailure).toHaveBeenCalledTimes(1);
   });
 
-  it("surfaces GraphQL errors returned with a 200 response", async () => {
-    stubFetch(jsonResponse({ data: null, errors: [{ message: "Not Found.", status: 404 }] }));
-    await expect(loadAnime(999999999)).rejects.toThrow(AnilistError);
-  });
-
-  it("does not retry a client error", async () => {
-    const fetchMock = stubFetch(errorResponse(404));
-    await expect(loadAnime(1)).rejects.toThrow(AnilistError);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("retries transient failures", async () => {
+  it("retries a transient failure once and then succeeds", async () => {
     const fetchMock = stubFetch(
       errorResponse(429, { "Retry-After": "0" }),
       dataResponse({ Page: { media: [{ ...media }] } }),
@@ -351,27 +349,20 @@ describe("AniList requests", () => {
     expect(anime.id).toBe(1);
   });
 
-  it("gives up with a friendly error once retries are exhausted", async () => {
-    const fetchMock = stubFetch(errorResponse(429, { "Retry-After": "0" }));
-    await expect(loadAnime(1)).rejects.toThrow(AnilistError);
-    // One initial attempt plus MAX_RETRIES (2) retries.
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-
-  it("never surfaces the raw API error text to callers", async () => {
-    stubFetch(errorResponse(404));
-    await expect(loadAnime(1)).rejects.toThrow(/AniList could not retrieve this anime/);
-  });
-
-  it("drops a failed request from the cache so the next call retries", async () => {
+  it("gives up with a friendly error once retries are exhausted and drops the failure from the cache", async () => {
     vi.useFakeTimers();
     const failing = vi.fn(async () => errorResponse(503));
     vi.stubGlobal("fetch", failing);
-    const failed = loadAnime(1).catch(() => undefined);
-    await vi.advanceTimersByTimeAsync(1500);
-    await failed;
-    expect(failing).toHaveBeenCalledTimes(3);
 
+    const failed = loadAnime(1).catch((error: unknown) => error);
+    // One initial attempt plus MAX_RETRIES (2) retries, spaced by 500ms + 1000ms.
+    await vi.advanceTimersByTimeAsync(1500);
+    const error = await failed;
+    expect(failing).toHaveBeenCalledTimes(3);
+    expect(error).toBeInstanceOf(AnilistError);
+    expect((error as AnilistError).message).not.toContain("Boom");
+
+    // The rejected promise must not stay cached, so a later call retries.
     const succeeding = stubFetch(dataResponse({ Page: { media: [{ ...media }] } }));
     expect((await loadAnime(1)).id).toBe(1);
     expect(succeeding).toHaveBeenCalledTimes(1);
@@ -379,7 +370,7 @@ describe("AniList requests", () => {
 });
 
 describe("AniList retry backoff", () => {
-  it("waits progressively longer when no Retry-After header is present", async () => {
+  it("waits progressively longer, and never zero, without a Retry-After header", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn(async () => errorResponse(503));
     vi.stubGlobal("fetch", fetchMock);
@@ -393,7 +384,11 @@ describe("AniList retry backoff", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // The first backoff is 500ms. Before it elapses there is no second attempt.
+    // A zero-length delay would already have produced a second attempt here.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // The first backoff is 500ms.
     await vi.advanceTimersByTimeAsync(499);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
@@ -411,63 +406,35 @@ describe("AniList retry backoff", () => {
     expect((settled as { error: unknown }).error).toBeInstanceOf(AnilistError);
   });
 
-  it("does not treat a missing Retry-After header as a zero-second retry", async () => {
+  it("honours a numeric Retry-After and ignores an unparseable one", async () => {
     vi.useFakeTimers();
-    const fetchMock = vi.fn(async () => errorResponse(503));
-    vi.stubGlobal("fetch", fetchMock);
 
-    const outcome = loadAnime(1).catch(() => undefined);
-
-    await vi.advanceTimersByTimeAsync(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    // A zero-length delay would have produced a second attempt by now.
-    await vi.advanceTimersByTimeAsync(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(500);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    // Drain the remaining retry so the promise settles and cannot dangle.
-    await vi.advanceTimersByTimeAsync(1000);
-    await outcome;
-  });
-
-  it("honours an explicit Retry-After header over the exponential backoff", async () => {
-    vi.useFakeTimers();
-    const fetchMock = stubFetch(
+    // The header asks for 2s, longer than the 500ms default backoff.
+    const honoured = stubFetch(
       errorResponse(429, { "Retry-After": "2" }),
       dataResponse({ Page: { media: [{ ...media }] } }),
     );
-
     const pending = loadAnime(1);
     await vi.advanceTimersByTimeAsync(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    // The header asks for 2s, longer than the 500ms default backoff.
+    expect(honoured).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1999);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(honoured).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
+    expect(honoured).toHaveBeenCalledTimes(2);
     expect((await pending).id).toBe(1);
-  });
 
-  it("ignores an unparseable Retry-After header and falls back to backoff", async () => {
-    vi.useFakeTimers();
-    const fetchMock = stubFetch(
+    // "soon" is not a number, so the exponential backoff applies instead.
+    const ignored = stubFetch(
       errorResponse(429, { "Retry-After": "soon" }),
       dataResponse({ Page: { media: [{ ...media }] } }),
     );
-
-    const pending = loadAnime(1);
+    const second = loadAnime(1);
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(499);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(ignored).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    expect((await pending).id).toBe(1);
+    expect(ignored).toHaveBeenCalledTimes(2);
+    expect((await second).id).toBe(1);
   });
 });
 
@@ -509,19 +476,13 @@ describe("AniList cancellation", () => {
     expect(fetchMockAfter).toHaveBeenCalledTimes(1);
   });
 
-  it("still deduplicates signal-less requests", async () => {
-    const fetchMock = stubFetch(dataResponse({ Page: { media: [media] } }));
-    await Promise.all([searchAnime("Cowboy"), searchAnime("Cowboy"), searchAnime("Cowboy")]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("rejects immediately when the signal is already aborted", async () => {
+  it("rejects without requesting when the signal is already aborted", async () => {
     const fetchMock = signalAwareFetch(() => dataResponse({ Page: { media: [media] } }));
     const controller = new AbortController();
     controller.abort();
 
     await expect(searchAnime("Cowboy", controller.signal)).rejects.toThrow(/cancelled/);
-    // An abort is terminal: the request must not be retried.
+    // An abort is terminal: the failed attempt must not be retried.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

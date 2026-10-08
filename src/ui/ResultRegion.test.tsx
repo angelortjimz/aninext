@@ -40,17 +40,12 @@ describe("ResultRegion", () => {
   it("renders the title, metadata, every reason and the based-on list", () => {
     render(<ResultRegion ui={recommended([yurei])} />);
 
+    expect(screen.getByRole("region", { name: "Yurei Deco" })).toBeDefined();
     expect(screen.getByRole("heading", { name: "Yurei Deco" })).toBeDefined();
     expect(screen.getByText("2020 - TV - 12 episodes")).toBeDefined();
     expect(screen.getByText("Shares a strong Drama tag")).toBeDefined();
     expect(screen.getByText("Adjacent in the same thematic cluster")).toBeDefined();
     expect(screen.getByText("Based on First Pick / Second Pick")).toBeDefined();
-  });
-
-  it("labels the recommendation region by the anime title", () => {
-    render(<ResultRegion ui={recommended([yurei])} />);
-    const region = screen.getByRole("region", { name: "Yurei Deco" });
-    expect(region).toBeDefined();
   });
 
   it("renders a filled placeholder when cover art is missing", () => {
@@ -76,13 +71,18 @@ describe("ResultRegion", () => {
     expect(screen.getAllByText("Anime").length).toBeGreaterThan(0);
   });
 
-  it.each([
-    ["no-match", "No discovery match yet"],
-    ["unavailable", "One selection is no longer available"],
-    ["error", "We could not find a recommendation"],
-  ] as const)("explains the %s outcome", (kind, heading) => {
-    render(<ResultRegion ui={{ kind }} />);
-    expect(screen.getByRole("heading", { name: heading })).toBeDefined();
+  it("explains every non-recommendation outcome", () => {
+    const outcomes: Array<[Exclude<UiState["kind"], "recommendation">, string]> = [
+      ["no-match", "No discovery match yet"],
+      ["unavailable", "One selection is no longer available"],
+      ["error", "We could not find a recommendation"],
+    ];
+
+    for (const [kind, heading] of outcomes) {
+      render(<ResultRegion ui={{ kind }} />);
+      expect(screen.getByRole("heading", { name: heading })).toBeDefined();
+      cleanup();
+    }
   });
 });
 
@@ -107,13 +107,14 @@ describe("ResultRegion re-roll", () => {
     expect(onReroll).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the button and notes exhaustion on the last result", () => {
-    render(<ResultRegion ui={recommended([yurei, recommendation(8)], 1)} onReroll={vi.fn()} />);
+  it("hides the re-roll once the queue is exhausted or holds one result", () => {
+    const { unmount } = render(
+      <ResultRegion ui={recommended([yurei, recommendation(8)], 1)} onReroll={vi.fn()} />,
+    );
     expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
     expect(screen.getByText("That was the last match for this combination.")).toBeDefined();
-  });
+    unmount();
 
-  it("hides the button on a single-result queue", () => {
     render(<ResultRegion ui={recommended([yurei])} onReroll={vi.fn()} />);
     expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
   });

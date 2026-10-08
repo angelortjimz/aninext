@@ -96,23 +96,22 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("renders three labelled search fields inside a main landmark", () => {
-    render(<App />);
+  it("renders three labelled search fields inside a polite main landmark", () => {
+    const { container } = render(<App />);
     expect(screen.getByRole("main")).toBeDefined();
     expect(screen.getAllByRole("combobox")).toHaveLength(3);
     expect(screen.getByLabelText("Anime 1")).toBeDefined();
     expect(screen.getByLabelText("Anime 2")).toBeDefined();
     expect(screen.getByLabelText("Anime 3")).toBeDefined();
-  });
-
-  it("starts idle with the submit button disabled and no result", () => {
-    render(<App />);
-    expect(submitButton().disabled).toBe(true);
-    expect(screen.queryByRole("region", { name: /recommendation/i })).toBeNull();
+    expect(container.querySelector('[aria-live="polite"]')).not.toBeNull();
   });
 
   it("keeps submit disabled until three distinct anime are chosen", async () => {
     render(<App />);
+    // Idle: nothing to submit and no result region at all.
+    expect(submitButton().disabled).toBe(true);
+    expect(screen.queryByRole("region", { name: /recommendation/i })).toBeNull();
+
     await select(0, 1, "Cowboy Bebop");
     expect(submitButton().disabled).toBe(true);
     await select(1, 2, "Trigun");
@@ -193,17 +192,6 @@ describe("App", () => {
     expect(api.batch).toHaveBeenCalledWith([1, 2, 3]);
     expect(recommendMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Based on First / Second")).toBeDefined();
-  });
-
-  it("shows the no-match outcome", async () => {
-    api.batch.mockResolvedValue([anime(1), anime(2), anime(3)]);
-    recommendMock.mockResolvedValue({ kind: "no-match" } satisfies RecommendationResult);
-
-    render(<App />);
-    await chooseThreeDistinct();
-    await submit();
-
-    expect(screen.getByRole("heading", { name: "No discovery match yet" })).toBeDefined();
   });
 
   it("reports unavailable when a selection cannot be re-fetched", async () => {
@@ -316,8 +304,10 @@ describe("App", () => {
       expect(api.batch).toHaveBeenCalledTimes(1);
     });
 
-    it("hides the button and notes exhaustion on the last result", async () => {
+    it("hides the button once the last result is shown", async () => {
       await showQueue(["First Pick", "Second Pick"]);
+      expect(rerollButton()).toBeDefined();
+
       await flush(() => {
         fireEvent.click(rerollButton());
       });
@@ -325,11 +315,6 @@ describe("App", () => {
       expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
       expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
       expect(screen.getByText("That was the last match for this combination.")).toBeDefined();
-    });
-
-    it("offers no re-roll when the queue holds a single result", async () => {
-      await showQueue(["Only Pick"]);
-      expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
     });
 
     it("resets to the top of the queue when the form is submitted again", async () => {
@@ -360,10 +345,5 @@ describe("App", () => {
       expect(screen.queryByRole("heading", { name: "First Pick" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
     });
-  });
-
-  it("announces results through a polite live region", () => {
-    const { container } = render(<App />);
-    expect(container.querySelector('[aria-live="polite"]')).not.toBeNull();
   });
 });
