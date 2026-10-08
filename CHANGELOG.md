@@ -8,11 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Re-roll control on the recommendation card: a "Seen it — show me
+- A re-roll control on the recommendation card: a "Seen it — show me
   another" button steps through the next-ranked eligible candidates
   without re-querying AniList. `recommend()` now returns the full
   ranked queue instead of only the winner, and the button is replaced
   by a note once every match has been seen
+- "Back to the previous one" beside the re-roll button, plus a visible
+  "N of M" queue position, so a skipped title is recoverable
+- Undo for the selection change that invalidates a result: the previous
+  card stays on screen dimmed with "Undo my last change" and
+  "Edit my picks" instead of vanishing
+- The anime metadata already in the model now reaches the result card —
+  native title, main studio and genre chips
+- Year, format and episode count stay visible under each locked search
+  field, so a pick can be verified after it is made
+- Anime already locked into another field is marked "Already chosen" and
+  disabled in the suggestion list, preventing a duplicate instead of
+  reporting one afterwards
+- A pick counter in the section note ("Choose 2 more") and a next action
+  in the exhausted-queue state
+- A shared `src/ui/format.ts` with `metaLine` and `studioLine`, replacing
+  two disagreeing metadata formatters ("26 eps" vs "26 episodes")
+- `nativeTitle` on `AnimeSearchResult`, dropped when it duplicates the
+  displayed title
+- Tests for the stale-card and undo flow, Enter-to-submit, duplicate
+  prevention in the suggestion list, the queue back control, focus
+  landing on the answer, and the reason copy naming the user's titles
 - Component tests for `App`, `SearchField` and `ResultRegion`, covering
   the selection state machine, every `UiState` branch, search debouncing
   and abort isolation, stale-response rejection, combobox keyboard
@@ -33,6 +54,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Reasons are written as an argument rather than a score dump: they name
+  the user's own picks ("Fans of Cowboy Bebop and Trigun also went on to
+  watch this"), lead with the strongest signal, and are capped at two.
+  The templates no longer leak `MIN_SHARED_SELECTIONS` or the phrase
+  "at least N selections", and the fallback is a concrete sentence
+  instead of "Strong overall metadata match"
+- Changing any of the three selections no longer clears a shown
+  recommendation. The card stays visible, dimmed, labelled as no longer
+  reflecting the current picks, with undo and edit-picks actions
+- The selector is a `<form>` with a `type="submit"` button, so Enter
+  completes the flow; focus moves to that button once the third distinct
+  pick lands
+- The result card is no longer wrapped in a blanket `aria-live` region,
+  which re-announced the whole card on every re-roll. A short
+  `role="status"` sentence carries the state instead, and focus moves to
+  the result heading when an answer arrives
+- The duplicate error is only in the DOM when there is a duplicate,
+  rather than registering an empty alert region from first paint
+- Error and status copy no longer names AniList in user-facing text
+- Each non-result state gets its own accent weight, replacing the
+  identical 4px left border on all four
+- `MAX_REASON_GENRES` and `MAX_REASON_THEMES` were replaced by a single
+  `MAX_REASONS` cap
+- `index.html` mounts into a `<div>` so the page has one `<main>`
+  landmark rather than two
+- ESLint ignores the `.opencode/` and `.impeccable/` tool directories,
+  which are outside the TypeScript project and failed to parse
 - The test suite was consolidated from 126 to 94 cases. Redundant
   restatements were folded into the test that already made the same
   claim — the four ways of reaching `no-match`, the adult/vanished/
@@ -42,9 +90,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   called twice, and assertions already covered by `App`). No behaviour
   lost its coverage; the `anilist` retry-exhaustion test moved onto fake
   timers, cutting that file from 1053ms to 37ms
-- Changing any of the three selections now clears a shown
-  recommendation. The card was scored against the previous three, so it
-  no longer applied
 - `RecommendationResult.recommendation` was replaced by `results`
   (the ranked queue) and `UiState` gained an `index` cursor for re-rolls
 - Focus outlines now meet WCAG 1.4.11 (3:1 non-text contrast) against

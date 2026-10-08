@@ -3,6 +3,7 @@ import type { Anime, CommunityRecommendation, RelatedAnime } from "@/models/anim
 export const anime = (id: number, overrides: Partial<Anime> = {}): Anime => ({
   id,
   title: `Anime ${id}`,
+  nativeTitle: null,
   imageUrl: null,
   type: "TV",
   year: 2020,
@@ -42,7 +43,6 @@ export const communityRecommendation = (
   title: `Anime ${id}`,
 });
 
-/** Deterministic shuffle so ordering tests can vary input without randomness. */
 export function reversed<T>(items: T[]): T[] {
   return [...items].reverse();
 }

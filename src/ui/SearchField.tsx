@@ -2,22 +2,27 @@ import { useEffect, useRef, useState, type ChangeEvent, type JSX, type KeyboardE
 import { SEARCH_MIN_LENGTH, searchAnime } from "@/api/anilist";
 import type { AnimeSearchResult } from "@/models/anime";
 import { SEARCH_DEBOUNCE_MS } from "./config";
+import { metaLine } from "./format";
 
 interface SearchFieldProps {
   index: number;
   disabled: boolean;
+  pickedIds: number[];
+  restoreToken: number;
+  restoredSelection: AnimeSearchResult | null;
   onSelectionChange: (selection: AnimeSearchResult | null) => void;
 }
 
-function meta(result: AnimeSearchResult): string {
-  return [result.year, result.type, result.episodes ? `${result.episodes} eps` : null]
-    .filter(Boolean)
-    .join(" - ");
-}
-
-export function SearchField({ index, disabled, onSelectionChange }: SearchFieldProps): JSX.Element {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<AnimeSearchResult | null>(null);
+export function SearchField({
+  index,
+  disabled,
+  pickedIds,
+  restoreToken,
+  restoredSelection,
+  onSelectionChange,
+}: SearchFieldProps): JSX.Element {
+  const [query, setQuery] = useState(restoredSelection?.title ?? "");
+  const [selected, setSelected] = useState<AnimeSearchResult | null>(restoredSelection);
   const [matches, setMatches] = useState<AnimeSearchResult[]>([]);
   const [status, setStatus] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -36,6 +41,31 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
       controllerRef.current?.abort();
     };
   }, []);
+
+  function applySelection(match: AnimeSearchResult | null): void {
+    window.clearTimeout(timerRef.current);
+    controllerRef.current?.abort();
+    setSelected(match);
+    setQuery(match?.title ?? "");
+    queryRef.current = match?.title ?? "";
+    setMatches([]);
+    setActiveIndex(-1);
+    setStatus(match ? "Selected" : "");
+  }
+
+  const appliedRestore = useRef(restoreToken);
+  useEffect(() => {
+    if (appliedRestore.current === restoreToken) return;
+    appliedRestore.current = restoreToken;
+    window.clearTimeout(timerRef.current);
+    controllerRef.current?.abort();
+    setSelected(restoredSelection);
+    setQuery(restoredSelection?.title ?? "");
+    queryRef.current = restoredSelection?.title ?? "";
+    setMatches([]);
+    setActiveIndex(-1);
+    setStatus(restoredSelection ? "Selected" : "");
+  }, [restoreToken, restoredSelection]);
 
   function dismissMatches(): void {
     setMatches([]);
@@ -100,29 +130,13 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
       const match = activeIndex >= 0 ? matches[activeIndex] : undefined;
       if (!match) return;
       event.preventDefault();
-      handleSelect(match);
+      applySelection(match);
+      onSelectionChange(match);
     }
   }
 
-  function handleSelect(match: AnimeSearchResult): void {
-    window.clearTimeout(timerRef.current);
-    controllerRef.current?.abort();
-    setSelected(match);
-    setQuery(match.title);
-    queryRef.current = match.title;
-    dismissMatches();
-    setStatus("Selected");
-    onSelectionChange(match);
-  }
-
   function handleClear(): void {
-    window.clearTimeout(timerRef.current);
-    controllerRef.current?.abort();
-    setSelected(null);
-    setQuery("");
-    queryRef.current = "";
-    dismissMatches();
-    setStatus("");
+    applySelection(null);
     onSelectionChange(null);
     inputRef.current?.focus();
   }
@@ -165,37 +179,47 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
           Clear
         </button>
       </div>
+      <p className="field-detail">{selected ? metaLine(selected) || "Anime" : ""}</p>
       <p id={`anime-status-${index}`} className="field-status" aria-live="polite">
         {status}
       </p>
       {hasMatches ? (
         <ul id={listId} className="suggestions" role="listbox" aria-label="Anime search results">
-          {matches.map((match, position) => (
-            <li
-              key={match.id}
-              id={optionId(position)}
-              role="option"
-              aria-selected={position === activeIndex}
-              className={position === activeIndex ? "suggestion is-active" : "suggestion"}
-            >
-              <button
-                className="suggestion-button"
-                type="button"
-                tabIndex={-1}
-                onClick={() => handleSelect(match)}
+          {matches.map((match, position) => {
+            const taken = selected?.id === match.id || pickedIds.includes(match.id);
+            return (
+              <li
+                key={match.id}
+                id={optionId(position)}
+                role="option"
+                aria-selected={position === activeIndex}
+                className={position === activeIndex ? "suggestion is-active" : "suggestion"}
               >
-                {match.imageUrl ? (
-                  <img className="suggestion-thumb" src={encodeURI(match.imageUrl)} alt="" />
-                ) : (
-                  <span className="suggestion-thumb"></span>
-                )}
-                <span>
-                  <strong className="suggestion-title">{match.title}</strong>
-                  <small className="suggestion-meta">{meta(match) || "Anime"}</small>
-                </span>
-              </button>
-            </li>
-          ))}
+                <button
+                  className="suggestion-button"
+                  type="button"
+                  tabIndex={-1}
+                  disabled={taken}
+                  onClick={() => {
+                    applySelection(match);
+                    onSelectionChange(match);
+                  }}
+                >
+                  {match.imageUrl ? (
+                    <img className="suggestion-thumb" src={encodeURI(match.imageUrl)} alt="" />
+                  ) : (
+                    <span className="suggestion-thumb"></span>
+                  )}
+                  <span>
+                    <strong className="suggestion-title">{match.title}</strong>
+                    <small className="suggestion-meta">
+                      {taken ? "Already chosen" : metaLine(match) || "Anime"}
+                    </small>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

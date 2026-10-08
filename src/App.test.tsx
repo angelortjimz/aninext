@@ -25,6 +25,7 @@ const recommendMock = vi.mocked(recommend);
 const searchResult = (id: number, title: string): AnimeSearchResult => ({
   id,
   title,
+  nativeTitle: null,
   imageUrl: null,
   type: "TV",
   year: 2020,
@@ -82,6 +83,16 @@ async function submit(): Promise<void> {
   await settlePromises();
 }
 
+/** The form submits on Enter from any field, not only on a pointer click. */
+async function submitWithEnter(): Promise<void> {
+  await flush(() => {
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Find a recommendation" }).closest("form")!,
+    );
+  });
+  await settlePromises();
+}
+
 beforeEach(() => {
   api.search.mockReset();
   api.batch.mockReset();
@@ -96,14 +107,45 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("renders three labelled search fields inside a polite main landmark", () => {
-    const { container } = render(<App />);
-    expect(screen.getByRole("main")).toBeDefined();
+  it("renders three labelled search fields inside a single main landmark", () => {
+    render(<App />);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getAllByRole("combobox")).toHaveLength(3);
     expect(screen.getByLabelText("Anime 1")).toBeDefined();
     expect(screen.getByLabelText("Anime 2")).toBeDefined();
     expect(screen.getByLabelText("Anime 3")).toBeDefined();
-    expect(container.querySelector('[aria-live="polite"]')).not.toBeNull();
+  });
+
+  it("counts down the picks still needed instead of leaving the user to count", () => {
+    render(<App />);
+    expect(screen.getByText(/Choose 3 more/)).toBeDefined();
+  });
+
+  it("does not register an alert region before anything can go wrong", () => {
+    render(<App />);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("marks anime already picked so a duplicate is prevented, not flagged", async () => {
+    api.search.mockResolvedValue([searchResult(1, "Cowboy Bebop"), searchResult(2, "Trigun")]);
+    render(<App />);
+    const input = screen.getAllByRole<HTMLInputElement>("combobox")[0]!;
+    await flush(() => {
+      fireEvent.change(input, { target: { value: "cow" } });
+    });
+    await passDebounce();
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect((screen.getAllByRole("combobox")[0] as HTMLInputElement).value).toBe("Cowboy Bebop");
+
+    const second = screen.getAllByRole<HTMLInputElement>("combobox")[1]!;
+    await flush(() => {
+      fireEvent.change(second, { target: { value: "cow" } });
+    });
+    await passDebounce();
+
+    expect(screen.getByRole("option", { name: /Already chosen/ })).toBeDefined();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("keeps submit disabled until three distinct anime are chosen", async () => {
@@ -118,6 +160,29 @@ describe("App", () => {
     expect(submitButton().disabled).toBe(true);
     await select(2, 3, "Nadia");
     expect(submitButton().disabled).toBe(false);
+  });
+
+  it("sends focus to the submit button once the third pick lands", async () => {
+    render(<App />);
+    expect(document.activeElement).not.toBe(submitButton());
+    await chooseThreeDistinct();
+    expect(document.activeElement).toBe(submitButton());
+  });
+
+  it("completes the whole flow from the keyboard, Enter included", async () => {
+    api.batch.mockResolvedValue([anime(1), anime(2), anime(3)]);
+    recommendMock.mockResolvedValue({
+      kind: "recommendation",
+      results: [
+        { anime: anime(9, { title: "Yurei Deco" }), reasons: ["Reason"], basedOn: [anime(1)] },
+      ],
+    } satisfies RecommendationResult);
+
+    render(<App />);
+    await chooseThreeDistinct();
+    await submitWithEnter();
+
+    expect(screen.getByRole("heading", { name: "Yurei Deco" })).toBeDefined();
   });
 
   it("rejects a repeated selection and explains why", async () => {
@@ -143,7 +208,7 @@ describe("App", () => {
     await flush(() => {
       fireEvent.click(clearButtons[1]!);
     });
-    expect(screen.getByRole("alert").textContent).toBe("");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("locks the fields and shows progress while a request is in flight", async () => {
@@ -304,7 +369,7 @@ describe("App", () => {
       expect(api.batch).toHaveBeenCalledTimes(1);
     });
 
-    it("hides the button once the last result is shown", async () => {
+    it("keeps the button but names a next action once the queue is exhausted", async () => {
       await showQueue(["First Pick", "Second Pick"]);
       expect(rerollButton()).toBeDefined();
 
@@ -313,8 +378,20 @@ describe("App", () => {
       });
 
       expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
-      expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
-      expect(screen.getByText("That was the last match for this combination.")).toBeDefined();
+      expect(screen.getByText(/Change one pick to explore again\./)).toBeDefined();
+    });
+
+    it("lets the user step back to a title they skipped", async () => {
+      await showQueue(["First Pick", "Second Pick"]);
+      await flush(() => {
+        fireEvent.click(rerollButton());
+      });
+      expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
+
+      await flush(() => {
+        fireEvent.click(screen.getByRole("button", { name: "Back to the previous one" }));
+      });
+      expect(screen.getByRole("heading", { name: "First Pick" })).toBeDefined();
     });
 
     it("resets to the top of the queue when the form is submitted again", async () => {
@@ -331,7 +408,7 @@ describe("App", () => {
       expect(rerollButton()).toBeDefined();
     });
 
-    it("clears the result when a selection changes", async () => {
+    it("keeps a changed result visible but dimmed, and can undo the change", async () => {
       await showQueue(["First Pick", "Second Pick"]);
       expect(screen.getByRole("heading", { name: "First Pick" })).toBeDefined();
 
@@ -342,8 +419,33 @@ describe("App", () => {
         fireEvent.click(clearButtons[0]!);
       });
 
-      expect(screen.queryByRole("heading", { name: "First Pick" })).toBeNull();
+      // The card is not silently destroyed, but it no longer claims to fit.
+      expect(screen.getByRole("heading", { name: "First Pick" })).toBeDefined();
+      expect(document.querySelector(".result-card")?.className).toContain("is-stale");
       expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
+
+      await flush(() => {
+        fireEvent.click(screen.getByRole("button", { name: "Undo my last change" }));
+      });
+
+      expect(document.querySelector(".result-card")?.className).not.toContain("is-stale");
+      expect((screen.getAllByRole("combobox")[0] as HTMLInputElement).value).toBe("Cowboy Bebop");
+      expect(rerollButton()).toBeDefined();
+    });
+
+    it("focuses the first field when the user chooses to edit instead of undo", async () => {
+      await showQueue(["First Pick"]);
+      const clearButtons = screen
+        .getAllByRole("button", { name: /^Clear Anime/ })
+        .filter((button) => !(button as HTMLButtonElement).disabled);
+      await flush(() => {
+        fireEvent.click(clearButtons[2]!);
+      });
+
+      await flush(() => {
+        fireEvent.click(screen.getByRole("button", { name: "Edit my picks" }));
+      });
+      expect(document.activeElement).toBe(screen.getAllByRole("combobox")[0]);
     });
   });
 });

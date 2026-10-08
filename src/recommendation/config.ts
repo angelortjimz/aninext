@@ -30,9 +30,7 @@ export const ERA_SIMILARITY_YEARS = 10;
 
 export const CANDIDATE_LIMIT = 24;
 
-export const MAX_REASON_GENRES = 2;
-
-export const MAX_REASON_THEMES = 1;
+export const MAX_REASONS = 2;
 
 export const REQUIRED_SELECTIONS = 3;
 

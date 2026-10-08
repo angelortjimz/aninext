@@ -115,6 +115,7 @@ describe("AniList normalization", () => {
     expect(normalizeSearchResult(media)).toEqual({
       id: 1,
       title: "Cowboy Bebop",
+      nativeTitle: "カウボーイビバップ",
       imageUrl: "cover.jpg",
       type: "TV",
       year: 1998,
@@ -137,6 +138,17 @@ describe("AniList normalization", () => {
       "R",
     );
     expect(normalizeSearchResult({ ...media, title: { native: "N" } }).title).toBe("N");
+  });
+
+  it("keeps the native title alongside the display title, and drops a duplicate", () => {
+    expect(normalizeSearchResult(media).nativeTitle).toBe("カウボーイビバップ");
+    expect(
+      normalizeSearchResult({
+        ...media,
+        title: { english: "Same", romaji: "Same", native: "Same" },
+      }).nativeTitle,
+    ).toBeNull();
+    expect(normalizeSearchResult({ ...media, title: { romaji: "R" } }).nativeTitle).toBeNull();
   });
 
   it("drops blank and unnamed studio edges", () => {

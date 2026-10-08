@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ComponentProps } from "react";
 import type { AnimeSearchResult } from "@/models/anime";
 import { SearchField } from "./SearchField";
 import { SEARCH_DEBOUNCE_MS } from "./config";
@@ -14,18 +15,34 @@ vi.mock("@/api/anilist", () => ({
 
 const combobox = (): HTMLInputElement => screen.getByRole<HTMLInputElement>("combobox");
 
-const result = (id: number, overrides: Partial<AnimeSearchResult> = {}): AnimeSearchResult => ({
-  id,
-  title: `Anime ${id}`,
-  imageUrl: null,
-  type: "TV",
-  year: 2020,
-  episodes: 12,
-  ...overrides,
-});
+const result = (id: number, overrides: Partial<AnimeSearchResult> = {}): AnimeSearchResult => {
+  const base: AnimeSearchResult = {
+    id,
+    title: `Anime ${id}`,
+    nativeTitle: null,
+    imageUrl: null,
+    type: "TV",
+    year: 2020,
+    episodes: 12,
+  };
+  return { ...base, ...overrides };
+};
 
-function renderField(onSelectionChange = vi.fn()) {
-  render(<SearchField index={1} disabled={false} onSelectionChange={onSelectionChange} />);
+function renderField(
+  onSelectionChange = vi.fn(),
+  props: Partial<ComponentProps<typeof SearchField>> = {},
+) {
+  render(
+    <SearchField
+      index={1}
+      disabled={false}
+      pickedIds={[]}
+      restoreToken={0}
+      restoredSelection={null}
+      onSelectionChange={onSelectionChange}
+      {...props}
+    />,
+  );
   return { onSelectionChange, input: combobox() };
 }
 
@@ -228,6 +245,61 @@ describe("SearchField", () => {
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
     expect(input.getAttribute("aria-activedescendant")).toBe("anime-results-1-option-1");
+  });
+
+  it("keeps the metadata visible after a pick, so the entry can be verified", async () => {
+    api.search.mockResolvedValue([result(1, { title: "Nadia", year: 1990, episodes: 46 })]);
+    const { input } = renderField();
+    await search(input, "nadia");
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(input.value).toBe("Nadia");
+    // The lock replaces the title only; year, format and length stay readable.
+    expect(screen.getByText("1990 - TV - 46 episodes")).toBeDefined();
+  });
+
+  it("marks an anime already locked into another field and refuses it", async () => {
+    api.search.mockResolvedValue([result(1, { title: "Nadia" }), result(2, { title: "Trigun" })]);
+    const { onSelectionChange, input } = renderField(vi.fn(), { pickedIds: [2] });
+    await search(input, "na");
+
+    const taken = screen.getByRole("option", { name: /Already chosen/ });
+    const button = taken.querySelector("button")!;
+    expect(button.disabled).toBe(true);
+
+    onSelectionChange.mockClear();
+    fireEvent.click(button);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  it("restores a handed-back selection into the field", async () => {
+    const onSelectionChange = vi.fn();
+    const { rerender } = render(
+      <SearchField
+        index={1}
+        disabled={false}
+        pickedIds={[]}
+        restoreToken={0}
+        restoredSelection={null}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+    expect(combobox().value).toBe("");
+
+    rerender(
+      <SearchField
+        index={1}
+        disabled={false}
+        pickedIds={[]}
+        restoreToken={1}
+        restoredSelection={result(1, { title: "Nadia" })}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+
+    expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("Nadia");
+    expect(screen.getByRole<HTMLInputElement>("combobox").readOnly).toBe(true);
+    expect(screen.getByText("Selected")).toBeDefined();
   });
 
   it("shows a thumbnail only when the result has cover art", async () => {

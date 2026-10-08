@@ -68,8 +68,7 @@ in-memory.
   configurable, not hardcoded.
 - Use the `@` alias for cross-directory `src/` imports; same-directory
   imports may stay relative.
-- Do not introduce unnecessary code comments. Comment a non-obvious
-  constraint or a bug that was fixed, not what the code plainly does.
+- Avoid code comments.
 - No `console.log` in `src/`; surface state through the `UiState` union.
 - Never weaken a `tsconfig.json` strict flag or silence an ESLint rule to
   make a build pass. Fix the code, or scope the rule off in

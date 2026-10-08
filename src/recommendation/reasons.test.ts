@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCandidateSeeds } from "./candidates";
-import { COMMUNITY_RELATION_TYPE, MAX_REASON_GENRES, MAX_REASON_THEMES } from "./config";
-import { anime, communityRecommendation, relation, selectedThree } from "./fixtures";
+import { COMMUNITY_RELATION_TYPE, MAX_REASONS, MIN_SHARED_SELECTIONS } from "./config";
+import { anime, communityRecommendation, relation, reversed, selectedThree } from "./fixtures";
 import { generateReasons } from "./reasons";
 import { scoreCandidate } from "./scoring";
 
@@ -18,7 +18,7 @@ function candidateFrom(
 }
 
 describe("generateReasons", () => {
-  it("produces factual reasons including community recommendations", () => {
+  it("names the user's own titles instead of counting selections", () => {
     const reasons = generateReasons(
       candidateFrom(
         [[relation(1, 10, "SIDE_STORY")], [relation(2, 10, "SPIN_OFF")], []],
@@ -26,72 +26,21 @@ describe("generateReasons", () => {
       ),
       selected,
     );
-    expect(reasons).toContain("Connected to 3 of your 3 selections");
-    expect(reasons).toContain("Frequently recommended by fans of your selections");
-    expect(reasons).toContain("Shares Drama with at least 2 selections");
+    expect(reasons[0]).toBe("Fans of Anime 1, Anime 2 and Anime 3 also went on to watch this.");
+    expect(reasons.join(" ")).not.toMatch(/at least|of your|Strong overall/);
   });
 
-  it("counts the actual number of selections", () => {
-    const two = [anime(1), anime(2)];
-    const seed = buildCandidateSeeds(two, [[relation(1, 10, "SIDE_STORY")], []], [[], []])[0];
-    if (!seed) throw new Error("expected a candidate seed");
-    const reasons = generateReasons(scoreCandidate(seed, anime(10), two), two);
-    expect(reasons[0]).toBe("Connected to 1 of your 2 selections");
-  });
-
-  it("only cites labels shared by at least two selections", () => {
-    const reasons = generateReasons(
-      candidateFrom([[relation(1, 10, "OTHER")], [], []], [[], [], []], {
-        genres: ["Drama", "Action", "Sci-Fi"],
-      }),
-      selected,
+  it("credits community recommendations in plain language", () => {
+    const candidate = candidateFrom([[], [], []], [[communityRecommendation(1, 10)], [], []]);
+    expect(candidate.relations.some((item) => item.relationType === COMMUNITY_RELATION_TYPE)).toBe(
+      true,
     );
-    expect(reasons).toContain("Shares Drama with at least 2 selections");
-    expect(reasons.some((reason) => reason.includes("Action"))).toBe(false);
-    expect(reasons.some((reason) => reason.includes("Sci-Fi"))).toBe(false);
+    expect(generateReasons(candidate, selected)[0]).toBe(
+      "Fans of Anime 1 also went on to watch this.",
+    );
   });
 
-  it("caps the number of genre and theme reasons", () => {
-    const reasons = generateReasons(
-      candidateFrom([[relation(1, 10, "OTHER")], [], []], [[], [], []], {
-        genres: ["Drama", "Mystery", "Action"],
-        themes: ["Psychological", "Time Travel", "School Life"],
-      }),
-      [
-        anime(1, {
-          genres: ["Drama", "Mystery", "Action"],
-          themes: ["Psychological", "Time Travel", "School Life"],
-        }),
-        anime(2, {
-          genres: ["Drama", "Mystery", "Action"],
-          themes: ["Psychological", "Time Travel", "School Life"],
-        }),
-        anime(3),
-      ],
-    );
-    const genreReasons = reasons.filter(
-      (reason) => reason.startsWith("Shares ") && !reason.includes("theme"),
-    );
-    const themeReasons = reasons.filter((reason) => reason.includes("theme"));
-    expect(genreReasons).toHaveLength(MAX_REASON_GENRES);
-    expect(themeReasons).toHaveLength(MAX_REASON_THEMES);
-  });
-
-  it("falls back to a metadata match when nothing else applies", () => {
-    const unconnected = scoreCandidate(
-      {
-        id: 10,
-        relations: [],
-        sourceCount: 0,
-        relationScore: 0,
-      },
-      anime(10, { genres: [], themes: [], mainStudios: [], type: null, year: null }),
-      selected,
-    );
-    expect(generateReasons(unconnected, selected)).toEqual(["Strong overall metadata match"]);
-  });
-
-  it("does not claim a community link without one", () => {
+  it("describes a plain relation without claiming fan consensus", () => {
     const reasons = generateReasons(
       candidateFrom([[relation(1, 10, "SIDE_STORY")], [], []], [[], [], []], {
         genres: [],
@@ -99,16 +48,80 @@ describe("generateReasons", () => {
       }),
       selected,
     );
+    expect(reasons[0]).toBe(
+      "Sits alongside Anime 1, a neighbouring story rather than the next episode.",
+    );
     expect(reasons.some((reason) => reason.includes("fans"))).toBe(false);
   });
 
-  it("claims a community link when one is present", () => {
-    const candidate = candidateFrom([[], [], []], [[communityRecommendation(1, 10)], [], []]);
-    expect(candidate.relations.some((item) => item.relationType === COMMUNITY_RELATION_TYPE)).toBe(
-      true,
+  it("names the selections that share a genre or theme", () => {
+    const unlinked = scoreCandidate(
+      { id: 10, relations: [], sourceCount: 0, relationScore: 0 },
+      anime(10, { genres: ["Drama"], themes: ["Psychological"] }),
+      selected,
     );
-    expect(generateReasons(candidate, selected)).toContain(
-      "Frequently recommended by fans of your selections",
+    expect(generateReasons(unlinked, selected)).toEqual([
+      "The Drama streak runs through Anime 1, Anime 2 and Anime 3.",
+      "It also carries the Psychological of Anime 1, Anime 2 and Anime 3.",
+    ]);
+  });
+
+  it("lets the connection outrank the metadata when both are available", () => {
+    const reasons = generateReasons(
+      candidateFrom([[relation(1, 10, "OTHER")], [], []], [[], [], []], {
+        genres: ["Drama"],
+        themes: ["Psychological"],
+      }),
+      selected,
     );
+    expect(reasons[0]).toContain("Anime 1");
+    expect(reasons[0]).not.toContain("Drama");
+    expect(reasons.some((reason) => reason.includes("Psychological"))).toBe(false);
+  });
+
+  it(`only cites labels shared by at least ${MIN_SHARED_SELECTIONS} selections`, () => {
+    const reasons = generateReasons(
+      candidateFrom([[relation(1, 10, "OTHER")], [], []], [[], [], []], {
+        genres: ["Drama", "Action", "Sci-Fi"],
+      }),
+      selected,
+    );
+    expect(reasons.some((reason) => reason.includes("Action"))).toBe(false);
+    expect(reasons.some((reason) => reason.includes("Sci-Fi"))).toBe(false);
+  });
+
+  it("leads with the strongest signal and caps the list", () => {
+    const reasons = generateReasons(
+      candidateFrom(
+        [[relation(1, 10, "SIDE_STORY")], [], []],
+        [[], [], [communityRecommendation(2, 10)]],
+        { genres: ["Drama", "Mystery", "Action"], themes: ["Psychological"] },
+      ),
+      selected,
+    );
+    expect(reasons).toHaveLength(MAX_REASONS);
+    expect(reasons[0]).toContain("Fans of Anime 1 and Anime 2");
+  });
+
+  it("falls back to a metadata sentence when nothing else applies", () => {
+    const unconnected = scoreCandidate(
+      { id: 10, relations: [], sourceCount: 0, relationScore: 0 },
+      anime(10, { genres: [], themes: [], mainStudios: [], type: null, year: null }),
+      selected,
+    );
+    expect(generateReasons(unconnected, selected)).toEqual([
+      "Closest match on genre, era and studio we could find.",
+    ]);
+  });
+
+  it("is deterministic regardless of selection order", () => {
+    const candidate = candidateFrom(
+      [[relation(1, 10, "SIDE_STORY")], [relation(2, 10, "OTHER")], []],
+      [[communityRecommendation(3, 10)], [], []],
+      { genres: ["Drama"], themes: ["Psychological"] },
+    );
+    const forward = generateReasons(candidate, selected);
+    const backward = generateReasons(candidate, reversed(selected));
+    expect(forward).toEqual(backward);
   });
 });

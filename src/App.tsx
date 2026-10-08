@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 import { getAnimeBatch } from "@/api/anilist";
 import type { AnimeSearchResult } from "@/models/anime";
 import type { UiState } from "@/models/ui";
@@ -13,6 +13,14 @@ export function App(): JSX.Element {
     Array<AnimeSearchResult | null>(FIELD_COUNT).fill(null),
   );
   const [ui, setUi] = useState<UiState>({ kind: "idle" });
+  const [scoredSelections, setScoredSelections] = useState<(AnimeSearchResult | null)[] | null>(
+    null,
+  );
+  const [restorePoint, setRestorePoint] = useState<(AnimeSearchResult | null)[] | null>(null);
+  const [restoreToken, setRestoreToken] = useState(0);
+
+  const submitRef = useRef<HTMLButtonElement | null>(null);
+  const firstFieldRef = useRef<HTMLDivElement | null>(null);
 
   const selected = selections.filter(
     (selection): selection is AnimeSearchResult => selection !== null,
@@ -21,19 +29,40 @@ export function App(): JSX.Element {
   const loading = ui.kind === "loading";
   const canSubmit = selected.length === FIELD_COUNT && !hasDuplicate && !loading;
 
+  const hasResult = ui.kind === "recommendation";
+  const isStale =
+    hasResult && scoredSelections !== null && scoredKey(scoredSelections) !== scoredKey(selections);
+
+  function scoredKey(items: (AnimeSearchResult | null)[]): string {
+    return items.map((item) => (item ? String(item.id) : "-")).join(",");
+  }
+
   function handleSelectionChange(index: number, selection: AnimeSearchResult | null): void {
+    if (selections[index]?.id === selection?.id) return;
+    if (hasResult) setRestorePoint(selections);
     setSelections((previous) => {
       const next = [...previous];
       next[index] = selection;
       return next;
     });
-    // A shown result was scored against the previous three, so it no longer applies.
-    setUi((previous) => (previous.kind === "recommendation" ? { kind: "idle" } : previous));
   }
 
-  async function handleSubmit(): Promise<void> {
+  function handleUndo(): void {
+    if (!restorePoint) return;
+    setSelections(restorePoint);
+    setRestoreToken((current) => current + 1);
+  }
+
+  function handleEditPicks(): void {
+    const first = firstFieldRef.current?.querySelector<HTMLInputElement>("input");
+    first?.focus();
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
     if (selected.length !== FIELD_COUNT) return;
     setUi({ kind: "loading" });
+    setRestorePoint(null);
     try {
       const detailed = await getAnimeBatch(selected.map((item) => item.id));
       if (detailed.length !== selected.length) {
@@ -41,18 +70,15 @@ export function App(): JSX.Element {
         return;
       }
       const result = await recommend(detailed);
-      setUi(
-        result.kind === "recommendation"
-          ? { kind: "recommendation", results: result.results, index: 0 }
-          : { kind: "no-match" },
-      );
+      if (result.kind === "recommendation") {
+        setScoredSelections([...selections]);
+        setUi({ kind: "recommendation", results: result.results, index: 0 });
+      } else {
+        setUi({ kind: "no-match" });
+      }
     } catch {
       setUi({ kind: "error" });
     }
-  }
-
-  function handleSubmitClick(): void {
-    void handleSubmit();
   }
 
   function handleReroll(): void {
@@ -60,6 +86,22 @@ export function App(): JSX.Element {
       previous.kind === "recommendation" ? { ...previous, index: previous.index + 1 } : previous,
     );
   }
+
+  function handleBack(): void {
+    setUi((previous) =>
+      previous.kind === "recommendation"
+        ? { ...previous, index: Math.max(previous.index - 1, 0) }
+        : previous,
+    );
+  }
+
+  useEffect(() => {
+    if (canSubmit) submitRef.current?.focus();
+  }, [canSubmit]);
+
+  const pickedIds = selections
+    .filter((selection): selection is AnimeSearchResult => selection !== null)
+    .map((selection) => selection.id);
 
   return (
     <main className="page">
@@ -71,38 +113,51 @@ export function App(): JSX.Element {
           installment.
         </p>
       </header>
-      <section className="selector" aria-labelledby="selection-title">
+      <form
+        className="selector"
+        aria-labelledby="selection-title"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
         <div className="section-heading">
           <h2 className="section-title" id="selection-title">
             Your three
           </h2>
-          <p className="section-note">Select an exact match from each search.</p>
+          <p className="section-note">
+            {selected.length < FIELD_COUNT
+              ? `Choose ${FIELD_COUNT - selected.length} more — pick an exact match from each search.`
+              : "All three chosen. Press Enter to find your recommendation."}
+          </p>
         </div>
-        <div className="search-grid">
+        <div className="search-grid" ref={firstFieldRef}>
           {selections.map((_, index) => (
             <SearchField
               key={index}
               index={index + 1}
               disabled={loading}
-              onSelectionChange={(selection) => handleSelectionChange(index, selection)}
+              pickedIds={pickedIds}
+              restoreToken={restoreToken}
+              restoredSelection={restorePoint?.[index] ?? null}
+              onSelectionChange={(next) => handleSelectionChange(index, next)}
             />
           ))}
         </div>
-        <p className="field-error" role="alert">
-          {hasDuplicate ? "Please select three different anime." : ""}
-        </p>
-        <button
-          className="submit-button"
-          type="button"
-          disabled={!canSubmit}
-          onClick={handleSubmitClick}
-        >
+        {hasDuplicate ? (
+          <p className="field-error" role="alert">
+            Please select three different anime.
+          </p>
+        ) : null}
+        <button className="submit-button" type="submit" ref={submitRef} disabled={!canSubmit}>
           Find a recommendation
         </button>
-      </section>
-      <div className="result-region" aria-live="polite">
-        <ResultRegion ui={ui} onReroll={handleReroll} />
-      </div>
+      </form>
+      <ResultRegion
+        ui={ui}
+        isStale={isStale}
+        onReroll={handleReroll}
+        onBack={handleBack}
+        onUndo={isStale && restorePoint ? handleUndo : undefined}
+        onEditPicks={isStale ? handleEditPicks : undefined}
+      />
     </main>
   );
 }

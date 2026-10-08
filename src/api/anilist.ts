@@ -225,10 +225,17 @@ function mediaTypeLabel(media: AnilistMedia): string | null {
   return media.type === "ANIME" ? "anime" : media.type === "MANGA" ? "manga" : null;
 }
 
+function nativeTitleOf(media: Pick<AnilistMedia, "title">, display: string): string | null {
+  const native = media.title?.native?.trim();
+  return native && native !== display ? native : null;
+}
+
 export function normalizeSearchResult(media: AnilistMedia): AnimeSearchResult {
+  const title = requiredTitle(media);
   return {
     id: requiredId(media),
-    title: requiredTitle(media),
+    title,
+    nativeTitle: nativeTitleOf(media, title),
     imageUrl: imageUrl(media),
     type: formatLabel(media),
     year: media.seasonYear ?? null,

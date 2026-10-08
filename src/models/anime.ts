@@ -1,6 +1,7 @@
 export interface AnimeSearchResult {
   id: number;
   title: string;
+  nativeTitle: string | null;
   imageUrl: string | null;
   type: string | null;
   year: number | null;
@@ -61,6 +62,5 @@ export interface Recommendation {
   basedOn: Anime[];
 }
 
-/** `results` is the full ranked queue; the UI walks it in order for re-rolls. */
 export type RecommendationResult =
   { kind: "recommendation"; results: Recommendation[] } | { kind: "no-match" };
