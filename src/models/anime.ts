@@ -61,5 +61,6 @@ export interface Recommendation {
   basedOn: Anime[];
 }
 
+/** `results` is the full ranked queue; the UI walks it in order for re-rolls. */
 export type RecommendationResult =
-  { kind: "recommendation"; recommendation: Recommendation } | { kind: "no-match" };
+  { kind: "recommendation"; results: Recommendation[] } | { kind: "no-match" };

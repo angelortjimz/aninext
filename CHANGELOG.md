@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Re-roll control on the recommendation card: a "Seen it — show me
+  another" button steps through the next-ranked eligible candidates
+  without re-querying AniList. `recommend()` now returns the full
+  ranked queue instead of only the winner, and the button is replaced
+  by a note once every match has been seen
 - Component tests for `App`, `SearchField` and `ResultRegion`, covering
   the selection state machine, every `UiState` branch, search debouncing
   and abort isolation, stale-response rejection, combobox keyboard
@@ -28,6 +33,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Changing any of the three selections now clears a shown
+  recommendation. The card was scored against the previous three, so it
+  no longer applied
+- `RecommendationResult.recommendation` was replaced by `results`
+  (the ranked queue) and `UiState` gained an `index` cursor for re-rolls
 - Focus outlines now meet WCAG 1.4.11 (3:1 non-text contrast) against
   the page surface, with an inner surface-coloured ring so they stay
   visible on both light and dark fills

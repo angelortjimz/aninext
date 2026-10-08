@@ -81,9 +81,40 @@ describe("recommend", () => {
     const result = await recommend(selected);
     expect(result.kind).toBe("recommendation");
     if (result.kind !== "recommendation") return;
-    expect(result.recommendation.anime.id).toBeGreaterThan(0);
-    expect(result.recommendation.basedOn.map((item) => item.id)).toEqual([1, 2, 3]);
-    expect(result.recommendation.reasons.length).toBeGreaterThan(0);
+    const best = result.results[0];
+    expect(best?.anime.id).toBeGreaterThan(0);
+    expect(best?.basedOn.map((item) => item.id)).toEqual([1, 2, 3]);
+    expect(best?.reasons.length).toBeGreaterThan(0);
+  });
+
+  it("returns every eligible candidate as a re-rollable ranked queue", async () => {
+    const selected = scenario([{ id: 10 }, { id: 11 }, { id: 12 }]);
+    const result = await recommend(selected);
+    expect(result.kind).toBe("recommendation");
+    if (result.kind !== "recommendation") return;
+    expect(result.results.map((item) => item.anime.id)).toEqual([10, 11, 12]);
+    // Every entry carries its own reasons and the same sources.
+    for (const entry of result.results) {
+      expect(entry.reasons.length).toBeGreaterThan(0);
+      expect(entry.basedOn.map((item) => item.id)).toEqual([1, 2, 3]);
+    }
+  });
+
+  it("never puts a dropped candidate into the re-roll queue", async () => {
+    const selected = scenario([{ id: 10, isAdult: true }, { id: 11, omit: true }, { id: 12 }]);
+    const result = await recommend(selected);
+    expect(result.kind).toBe("recommendation");
+    if (result.kind !== "recommendation") return;
+    expect(result.results.map((item) => item.anime.id)).toEqual([12]);
+  });
+
+  it("never repeats an anime within the queue", async () => {
+    const selected = scenario([{ id: 10 }, { id: 10 }, { id: 11 }]);
+    const result = await recommend(selected);
+    expect(result.kind).toBe("recommendation");
+    if (result.kind !== "recommendation") return;
+    const ids = result.results.map((item) => item.anime.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("reports no match when no candidate is eligible", async () => {
@@ -99,8 +130,8 @@ describe("recommend", () => {
     const result = await recommend(selected);
     expect(result.kind).toBe("recommendation");
     if (result.kind !== "recommendation") return;
-    expect(result.recommendation.anime.isAdult).toBe(false);
-    expect(result.recommendation.anime.id).not.toBe(10);
+    expect(result.results[0]?.anime.isAdult).toBe(false);
+    expect(result.results[0]?.anime.id).not.toBe(10);
   });
 
   it("reports no match when every candidate is adult", async () => {
@@ -113,7 +144,7 @@ describe("recommend", () => {
     const result = await recommend(selected);
     expect(result.kind).toBe("recommendation");
     if (result.kind !== "recommendation") return;
-    expect(result.recommendation.anime.id).toBe(11);
+    expect(result.results[0]?.anime.id).toBe(11);
   });
 
   it("returns no match when every candidate has vanished", async () => {
@@ -126,7 +157,7 @@ describe("recommend", () => {
     const result = await recommend(selected);
     expect(result.kind).toBe("recommendation");
     if (result.kind !== "recommendation") return;
-    expect(result.recommendation.anime.id).not.toBe(1);
+    expect(result.results[0]?.anime.id).not.toBe(1);
   });
 
   it("picks the higher scoring candidate", async () => {
@@ -138,7 +169,7 @@ describe("recommend", () => {
     const result = await recommend(selected);
     expect(result.kind).toBe("recommendation");
     if (result.kind !== "recommendation") return;
-    expect(result.recommendation.anime.id).toBe(11);
+    expect(result.results[0]?.anime.id).toBe(11);
   });
 
   it("is deterministic across repeated calls and shuffled candidates", async () => {
@@ -158,8 +189,12 @@ describe("recommend", () => {
     expect(runA.kind).toBe("recommendation");
     expect(runC.kind).toBe("recommendation");
     if (runA.kind !== "recommendation" || runC.kind !== "recommendation") return;
-    expect(runC.recommendation.anime.id).toBe(runA.recommendation.anime.id);
-    expect(runC.recommendation.reasons).toEqual(runA.recommendation.reasons);
+    expect(runC.results[0]?.anime.id).toBe(runA.results[0]?.anime.id);
+    expect(runC.results[0]?.reasons).toEqual(runA.results[0]?.reasons);
+    // The whole queue is order-stable, not just the winner.
+    expect(runC.results.map((item) => item.anime.id)).toEqual(
+      runA.results.map((item) => item.anime.id),
+    );
   });
 
   it("produces identical output for reordered selections", async () => {
@@ -174,8 +209,11 @@ describe("recommend", () => {
     expect(resultForward.kind).toBe("recommendation");
     expect(resultBackward.kind).toBe("recommendation");
     if (resultForward.kind !== "recommendation" || resultBackward.kind !== "recommendation") return;
-    expect(resultBackward.recommendation.anime.id).toBe(resultForward.recommendation.anime.id);
-    expect(resultBackward.recommendation.reasons).toEqual(resultForward.recommendation.reasons);
+    expect(resultBackward.results[0]?.anime.id).toBe(resultForward.results[0]?.anime.id);
+    expect(resultBackward.results[0]?.reasons).toEqual(resultForward.results[0]?.reasons);
+    expect(resultBackward.results.map((item) => item.anime.id)).toEqual(
+      resultForward.results.map((item) => item.anime.id),
+    );
   });
 
   it("propagates a failure from the connections lookup", async () => {

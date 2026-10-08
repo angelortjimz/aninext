@@ -9,7 +9,20 @@ function details(recommendation: Recommendation): string {
     .join(" - ");
 }
 
-function RecommendationCard({ recommendation }: { recommendation: Recommendation }): JSX.Element {
+interface ResultRegionProps {
+  ui: UiState;
+  onReroll?: () => void;
+}
+
+function RecommendationCard({
+  recommendation,
+  hasAnother,
+  onReroll,
+}: {
+  recommendation: Recommendation;
+  hasAnother: boolean;
+  onReroll?: () => void;
+}): JSX.Element {
   const anime = recommendation.anime;
   return (
     <section className="result-card" aria-labelledby="recommendation-title">
@@ -40,11 +53,22 @@ function RecommendationCard({ recommendation }: { recommendation: Recommendation
       <p className="based-on">
         Based on {recommendation.basedOn.map((item) => item.title).join(" / ")}
       </p>
+      {onReroll ? (
+        <div className="result-actions">
+          {hasAnother ? (
+            <button className="reroll-button" type="button" onClick={onReroll}>
+              Seen it — show me another
+            </button>
+          ) : (
+            <p className="exhausted-note">That was the last match for this combination.</p>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }
 
-export function ResultRegion({ ui }: { ui: UiState }): JSX.Element | null {
+export function ResultRegion({ ui, onReroll }: ResultRegionProps): JSX.Element | null {
   if (ui.kind === "idle") return null;
   if (ui.kind === "loading") {
     return (
@@ -85,5 +109,14 @@ export function ResultRegion({ ui }: { ui: UiState }): JSX.Element | null {
       </section>
     );
   }
-  return <RecommendationCard recommendation={ui.recommendation} />;
+  const current = ui.results[ui.index] ?? ui.results[0];
+  if (!current) return null;
+  return (
+    <RecommendationCard
+      key={current.anime.id}
+      recommendation={current}
+      hasAnother={ui.index + 1 < ui.results.length}
+      onReroll={onReroll}
+    />
+  );
 }

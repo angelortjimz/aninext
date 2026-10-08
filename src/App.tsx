@@ -27,6 +27,8 @@ export function App(): JSX.Element {
       next[index] = selection;
       return next;
     });
+    // A shown result was scored against the previous three, so it no longer applies.
+    setUi((previous) => (previous.kind === "recommendation" ? { kind: "idle" } : previous));
   }
 
   async function handleSubmit(): Promise<void> {
@@ -41,7 +43,7 @@ export function App(): JSX.Element {
       const result = await recommend(detailed);
       setUi(
         result.kind === "recommendation"
-          ? { kind: "recommendation", recommendation: result.recommendation }
+          ? { kind: "recommendation", results: result.results, index: 0 }
           : { kind: "no-match" },
       );
     } catch {
@@ -51,6 +53,12 @@ export function App(): JSX.Element {
 
   function handleSubmitClick(): void {
     void handleSubmit();
+  }
+
+  function handleReroll(): void {
+    setUi((previous) =>
+      previous.kind === "recommendation" ? { ...previous, index: previous.index + 1 } : previous,
+    );
   }
 
   return (
@@ -93,7 +101,7 @@ export function App(): JSX.Element {
         </button>
       </section>
       <div className="result-region" aria-live="polite">
-        <ResultRegion ui={ui} />
+        <ResultRegion ui={ui} onReroll={handleReroll} />
       </div>
     </main>
   );

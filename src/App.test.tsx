@@ -176,11 +176,13 @@ describe("App", () => {
     api.batch.mockResolvedValue([anime(1), anime(2), anime(3)]);
     recommendMock.mockResolvedValue({
       kind: "recommendation",
-      recommendation: {
-        anime: anime(9, { title: "Yurei Deco" }),
-        reasons: ["Shares a strong Drama tag"],
-        basedOn: [anime(1, { title: "First" }), anime(2, { title: "Second" })],
-      },
+      results: [
+        {
+          anime: anime(9, { title: "Yurei Deco" }),
+          reasons: ["Shares a strong Drama tag"],
+          basedOn: [anime(1, { title: "First" }), anime(2, { title: "Second" })],
+        },
+      ],
     } satisfies RecommendationResult);
 
     render(<App />);
@@ -235,11 +237,13 @@ describe("App", () => {
     api.batch.mockResolvedValue([anime(1), anime(2), anime(3)]);
     recommendMock.mockResolvedValue({
       kind: "recommendation",
-      recommendation: {
-        anime: anime(9, { title: "Yurei Deco" }),
-        reasons: ["First reason"],
-        basedOn: [anime(1, { title: "First" })],
-      },
+      results: [
+        {
+          anime: anime(9, { title: "Yurei Deco" }),
+          reasons: ["First reason"],
+          basedOn: [anime(1, { title: "First" })],
+        },
+      ],
     } satisfies RecommendationResult);
 
     render(<App />);
@@ -265,6 +269,97 @@ describe("App", () => {
     release?.();
     await settlePromises();
     expect(screen.getByRole("heading", { name: "No discovery match yet" })).toBeDefined();
+  });
+
+  describe("re-roll", () => {
+    const entry = (id: number, title: string) => ({
+      anime: anime(id, { title }),
+      reasons: [`Reason for ${title}`],
+      basedOn: [anime(1, { title: "First" })],
+    });
+
+    function queue(titles: string[]): RecommendationResult {
+      return {
+        kind: "recommendation",
+        results: titles.map((title, position) => entry(position + 9, title)),
+      };
+    }
+
+    async function showQueue(titles: string[]): Promise<void> {
+      api.batch.mockResolvedValue([anime(1), anime(2), anime(3)]);
+      recommendMock.mockResolvedValue(queue(titles));
+      render(<App />);
+      await chooseThreeDistinct();
+      await submit();
+    }
+
+    function rerollButton(): HTMLButtonElement {
+      return screen.getByRole<HTMLButtonElement>("button", { name: "Seen it — show me another" });
+    }
+
+    it("walks the queue in ranked order without re-querying AniList", async () => {
+      await showQueue(["First Pick", "Second Pick", "Third Pick"]);
+      expect(screen.getByRole("heading", { name: "First Pick" })).toBeDefined();
+
+      await flush(() => {
+        fireEvent.click(rerollButton());
+      });
+      expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
+      expect(screen.queryByRole("heading", { name: "First Pick" })).toBeNull();
+
+      await flush(() => {
+        fireEvent.click(rerollButton());
+      });
+      expect(screen.getByRole("heading", { name: "Third Pick" })).toBeDefined();
+
+      expect(recommendMock).toHaveBeenCalledTimes(1);
+      expect(api.batch).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides the button and notes exhaustion on the last result", async () => {
+      await showQueue(["First Pick", "Second Pick"]);
+      await flush(() => {
+        fireEvent.click(rerollButton());
+      });
+
+      expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
+      expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
+      expect(screen.getByText("That was the last match for this combination.")).toBeDefined();
+    });
+
+    it("offers no re-roll when the queue holds a single result", async () => {
+      await showQueue(["Only Pick"]);
+      expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
+    });
+
+    it("resets to the top of the queue when the form is submitted again", async () => {
+      await showQueue(["First Pick", "Second Pick"]);
+      await flush(() => {
+        fireEvent.click(rerollButton());
+      });
+      expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
+
+      recommendMock.mockResolvedValue(queue(["First Pick", "Second Pick"]));
+      await submit();
+
+      expect(screen.getByRole("heading", { name: "First Pick" })).toBeDefined();
+      expect(rerollButton()).toBeDefined();
+    });
+
+    it("clears the result when a selection changes", async () => {
+      await showQueue(["First Pick", "Second Pick"]);
+      expect(screen.getByRole("heading", { name: "First Pick" })).toBeDefined();
+
+      const clearButtons = screen
+        .getAllByRole("button", { name: /^Clear Anime/ })
+        .filter((button) => !(button as HTMLButtonElement).disabled);
+      await flush(() => {
+        fireEvent.click(clearButtons[0]!);
+      });
+
+      expect(screen.queryByRole("heading", { name: "First Pick" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
+    });
   });
 
   it("announces results through a polite live region", () => {

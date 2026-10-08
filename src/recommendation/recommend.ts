@@ -28,15 +28,11 @@ export async function recommend(selected: Anime[]): Promise<RecommendationResult
     connections.map((connection) => connection.recommendations),
   );
   if (seeds.length === 0) return { kind: "no-match" };
-  const ranked = rankCandidates(await hydrateCandidates(seeds, selected));
-  const best = ranked[0];
-  if (!best) return { kind: "no-match" };
-  return {
-    kind: "recommendation",
-    recommendation: {
-      anime: best.anime,
-      reasons: generateReasons(best, selected),
-      basedOn: selected,
-    },
-  };
+  const results = rankCandidates(await hydrateCandidates(seeds, selected)).map((candidate) => ({
+    anime: candidate.anime,
+    reasons: generateReasons(candidate, selected),
+    basedOn: selected,
+  }));
+  if (results.length === 0) return { kind: "no-match" };
+  return { kind: "recommendation", results };
 }

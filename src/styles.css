@@ -403,6 +403,28 @@
     font-size: var(--text-xs);
   }
 
+  .result-actions {
+    margin-top: var(--space-4);
+  }
+
+  .reroll-button {
+    border: 1px solid var(--border-strong);
+    padding: var(--space-2) var(--space-4);
+    color: var(--ink-strong);
+    background: transparent;
+    font-weight: 600;
+  }
+
+  .reroll-button:hover {
+    border-color: var(--ink-strong);
+    background: var(--surface-sunken);
+  }
+
+  .exhausted-note {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+  }
+
   /* messages -------------------------------------------------------- */
 
   .message-card {
