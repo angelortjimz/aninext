@@ -8,6 +8,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- A design-token layer for colour, type scale, spacing and layout
+  constants, consumed through `var()` so no raw hex or magic number
+  remains in the component rules
+- A minimum text size of `0.875rem`, replacing the previous
+  `0.78`–`0.9rem` status, label and metadata sizes
+- A `prefers-reduced-motion` guard that stops the loading spinner
+- An explicit disabled treatment for the submit button, replacing
+  `opacity: 0.45`, so the control stays readable while disabled
+- `::-webkit-search-cancel-button` suppression, so the browser's own
+  clear affordance no longer duplicates the field's Clear button
+
+### Changed
+
+- Focus outlines now meet WCAG 1.4.11 (3:1 non-text contrast) against
+  the page surface, with an inner surface-coloured ring so they stay
+  visible on both light and dark fills
+- Muted text, the search input border and the suggestion meta text were
+  darkened to meet WCAG 1.4.5 (4.5:1 text contrast)
+- Element-level selectors (`h1, h2, h3, p`, `label`, `input`, `ul`)
+  replaced with component classes, and the stylesheet is split into
+  `reset`, `tokens`, `base` and `components` cascade layers
+- `Inter` was dropped from the font stack in favour of a system font
+  stack; it was never loaded, so every visitor already received
+  `system-ui`
+- `.cover-placeholder`, which had no matching rule, is now
+  `.cover--placeholder`, and the search-result placeholder shares a
+  single `.suggestion-thumb` class
+- `.page-shell` is now the `<main>` landmark, and the search field is
+  a `<div>` rather than an unattributed `<section>`
+- Body text now inherits a `1.5` line height, and long body copy is
+  constrained to a `68ch` measure
+
 - ESLint 9 (flat config, type-aware via `typescript-eslint`) and Prettier
   as devDependencies, with `lint`, `lint:fix`, `format`, `format:check`,
   `typecheck` and `check` scripts. `check` runs lint, format, tests and

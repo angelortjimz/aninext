@@ -1,4 +1,4 @@
-# Next Frame
+# AniNext
 
 A small, deterministic anime recommendation app powered by the AniList API. Pick three distinct anime and receive one SFW, discovery-first recommendation based on eligible related titles, community recommendations, and metadata similarity.
 

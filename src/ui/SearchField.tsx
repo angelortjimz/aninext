@@ -130,10 +130,13 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
   const hasMatches = matches.length > 0;
 
   return (
-    <section className="search-field">
-      <label htmlFor={`anime-search-${index}`}>Anime {index}</label>
-      <div className="search-control">
+    <div className="field">
+      <label className="field-label" htmlFor={`anime-search-${index}`}>
+        Anime {index}
+      </label>
+      <div className="field-control">
         <input
+          className="field-input"
           id={`anime-search-${index}`}
           ref={inputRef}
           type="search"
@@ -152,7 +155,7 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
           onKeyDown={handleKeyDown}
         />
         <button
-          className="clear-button"
+          className="field-clear"
           type="button"
           aria-label={`Clear Anime ${index}`}
           hidden={selected === null}
@@ -166,30 +169,35 @@ export function SearchField({ index, disabled, onSelectionChange }: SearchFieldP
         {status}
       </p>
       {hasMatches ? (
-        <ul id={listId} className="search-results" role="listbox" aria-label="Anime search results">
+        <ul id={listId} className="suggestions" role="listbox" aria-label="Anime search results">
           {matches.map((match, position) => (
             <li
               key={match.id}
               id={optionId(position)}
               role="option"
               aria-selected={position === activeIndex}
-              className={position === activeIndex ? "search-result is-active" : "search-result"}
+              className={position === activeIndex ? "suggestion is-active" : "suggestion"}
             >
-              <button type="button" tabIndex={-1} onClick={() => handleSelect(match)}>
+              <button
+                className="suggestion-button"
+                type="button"
+                tabIndex={-1}
+                onClick={() => handleSelect(match)}
+              >
                 {match.imageUrl ? (
-                  <img src={encodeURI(match.imageUrl)} alt="" />
+                  <img className="suggestion-thumb" src={encodeURI(match.imageUrl)} alt="" />
                 ) : (
-                  <span className="image-placeholder"></span>
+                  <span className="suggestion-thumb"></span>
                 )}
                 <span>
-                  <strong>{match.title}</strong>
-                  <small>{meta(match) || "Anime"}</small>
+                  <strong className="suggestion-title">{match.title}</strong>
+                  <small className="suggestion-meta">{meta(match) || "Anime"}</small>
                 </span>
               </button>
             </li>
           ))}
         </ul>
       ) : null}
-    </section>
+    </div>
   );
 }

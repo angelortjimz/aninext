@@ -54,19 +54,21 @@ export function App(): JSX.Element {
   }
 
   return (
-    <div className="page-shell">
+    <main className="page">
       <header className="masthead">
         <p className="eyebrow">Anime discovery engine</p>
-        <h1>What should you watch next?</h1>
-        <p>
+        <h1 className="display-title">What should you watch next?</h1>
+        <p className="lead">
           Pick three anime you enjoyed. We will find one adjacent discovery, not the next franchise
           installment.
         </p>
       </header>
       <section className="selector" aria-labelledby="selection-title">
         <div className="section-heading">
-          <h2 id="selection-title">Your three</h2>
-          <p>Select an exact match from each search.</p>
+          <h2 className="section-title" id="selection-title">
+            Your three
+          </h2>
+          <p className="section-note">Select an exact match from each search.</p>
         </div>
         <div className="search-grid">
           {selections.map((_, index) => (
@@ -78,11 +80,11 @@ export function App(): JSX.Element {
             />
           ))}
         </div>
-        <p className="selection-error" role="alert">
+        <p className="field-error" role="alert">
           {hasDuplicate ? "Please select three different anime." : ""}
         </p>
         <button
-          className="recommend-button"
+          className="submit-button"
           type="button"
           disabled={!canSubmit}
           onClick={handleSubmitClick}
@@ -93,6 +95,6 @@ export function App(): JSX.Element {
       <div className="result-region" aria-live="polite">
         <ResultRegion ui={ui} />
       </div>
-    </div>
+    </main>
   );
 }

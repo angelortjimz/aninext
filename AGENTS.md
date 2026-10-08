@@ -4,7 +4,7 @@ Instructions for AI coding agents working in this repository.
 
 ## Project
 
-Next Frame — a small, deterministic anime recommendation app powered by the
+AniNext — a small, deterministic anime recommendation app powered by the
 AniList API. The user picks three distinct anime and receives one SFW,
 discovery-first recommendation based on eligible related titles, community
 recommendations, and metadata similarity. React 19 + TypeScript + Vite

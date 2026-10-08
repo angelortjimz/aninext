@@ -12,9 +12,9 @@ function details(recommendation: Recommendation): string {
 function RecommendationCard({ recommendation }: { recommendation: Recommendation }): JSX.Element {
   const anime = recommendation.anime;
   return (
-    <section className="recommendation" aria-labelledby="recommendation-title">
+    <section className="result-card" aria-labelledby="recommendation-title">
       <p className="eyebrow">Your recommendation</p>
-      <div className="recommendation-layout">
+      <div className="result-layout">
         {anime.imageUrl ? (
           <img
             className="cover"
@@ -22,13 +22,15 @@ function RecommendationCard({ recommendation }: { recommendation: Recommendation
             alt={`Cover art for ${anime.title}`}
           />
         ) : (
-          <div className="cover cover-placeholder" aria-hidden="true"></div>
+          <div className="cover cover--placeholder" aria-hidden="true"></div>
         )}
         <div>
-          <h2 id="recommendation-title">{anime.title}</h2>
-          <p className="muted">{details(recommendation) || "Anime"}</p>
-          <h3>Why this one</h3>
-          <ul>
+          <h2 className="result-title" id="recommendation-title">
+            {anime.title}
+          </h2>
+          <p className="meta">{details(recommendation) || "Anime"}</p>
+          <h3 className="reason-heading">Why this one</h3>
+          <ul className="reason-list">
             {recommendation.reasons.map((reason, position) => (
               <li key={position}>{reason}</li>
             ))}
@@ -48,15 +50,15 @@ export function ResultRegion({ ui }: { ui: UiState }): JSX.Element | null {
     return (
       <section className="message-card loading">
         <span className="spinner" aria-hidden="true"></span>
-        <p>Finding your next frame...</p>
+        <p className="message-body">Finding your next anime...</p>
       </section>
     );
   }
   if (ui.kind === "no-match") {
     return (
       <section className="message-card">
-        <h2>No discovery match yet</h2>
-        <p>
+        <h2 className="card-title">No discovery match yet</h2>
+        <p className="message-body">
           These choices only led to direct franchise continuations or unavailable titles. Try a
           different mix of anime.
         </p>
@@ -66,16 +68,20 @@ export function ResultRegion({ ui }: { ui: UiState }): JSX.Element | null {
   if (ui.kind === "unavailable") {
     return (
       <section className="message-card">
-        <h2>One selection is no longer available</h2>
-        <p>AniList no longer lists one of the anime you picked. Clear that field and try again.</p>
+        <h2 className="card-title">One selection is no longer available</h2>
+        <p className="message-body">
+          AniList no longer lists one of the anime you picked. Clear that field and try again.
+        </p>
       </section>
     );
   }
   if (ui.kind === "error") {
     return (
       <section className="message-card">
-        <h2>We could not find a recommendation</h2>
-        <p>AniList is temporarily unavailable. Please try again in a moment.</p>
+        <h2 className="card-title">We could not find a recommendation</h2>
+        <p className="message-body">
+          AniList is temporarily unavailable. Please try again in a moment.
+        </p>
       </section>
     );
   }
