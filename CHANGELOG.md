@@ -59,6 +59,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The recommendation card now reads as the peak of the page instead of a
+  quiet continuation of the selector: it is set off by the same 3px ink
+  rule the selector uses (drawn in once on arrival, respecting reduced
+  motion), the cover art sits on a soft plate, the title steps up to a
+  dedicated display size, and the re-roll control becomes the card's
+  primary solid action with the secondary actions kept quiet. Eyebrow,
+  "Why this one" and "Based on" are separated by hairline rules so the
+  card scans in three bands
 - Reasons are written as an argument rather than a score dump: they name
   the user's own picks ("Fans of Cowboy Bebop and Trigun also went on to
   watch this"), lead with the strongest signal, and are capped at two.
@@ -220,6 +228,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The result card renders the "View on AniList" link its test asserted.
+  The link was documented and covered but never rendered, so
+  `ResultRegion.test.tsx` failed on a clean checkout
 - Retry backoff was effectively disabled. A missing `Retry-After` header
   returned `null`, and `Number(null)` is `0`, which passed the
   `Number.isFinite` check — so every 429/5xx retry waited 0 ms instead of

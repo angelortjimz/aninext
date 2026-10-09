@@ -42,6 +42,7 @@
     --text-lg: 1.375rem;
     --text-xl: 2.25rem;
     --text-display: clamp(2.5rem, 5vw, 4.5rem);
+    --text-result: clamp(2rem, 4vw, 3.25rem);
 
     --space-1: 4px;
     --space-2: 8px;
@@ -59,6 +60,7 @@
     --thumb-size: 34px;
 
     --shadow-menu: 0 12px 28px rgb(24 46 59 / 16%);
+    --shadow-plate: 8px 8px 24px rgb(24 46 59 / 14%);
     --focus-ring: 0 0 0 2px var(--surface-raised);
   }
 
@@ -346,7 +348,7 @@
   /* results --------------------------------------------------------- */
 
   .result-region {
-    margin-top: var(--space-6);
+    margin-top: var(--space-8);
   }
 
   .visually-hidden {
@@ -361,11 +363,40 @@
   }
 
   .result-card {
-    padding: var(--space-3) 0;
+    position: relative;
+    padding: var(--space-4) 0 var(--space-5);
   }
 
-  .result-card.is-stale {
-    border-bottom-style: dashed;
+  @keyframes rule-draw {
+    from {
+      transform: scaleX(0);
+    }
+
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  .result-card::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--ink-strong);
+    content: "";
+    transform-origin: left center;
+    animation: rule-draw 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .result-card::before {
+      animation: none;
+    }
+  }
+
+  .result-card.is-stale::before {
+    background: var(--border-strong);
   }
 
   .result-card.is-stale .cover,
@@ -383,6 +414,8 @@
     justify-content: space-between;
     gap: var(--space-4);
     align-items: baseline;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-hairline);
   }
 
   .result-head .eyebrow,
@@ -420,6 +453,7 @@
     aspect-ratio: 2 / 3;
     object-fit: cover;
     background: var(--media-fill);
+    box-shadow: var(--shadow-plate);
   }
 
   .cover--placeholder {
@@ -429,9 +463,11 @@
   .result-title {
     color: var(--ink-strong);
     font-family: var(--font-serif);
-    font-size: var(--text-xl);
+    font-size: var(--text-result);
     font-weight: 500;
-    line-height: 1.15;
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
   }
 
   .result-title:focus {
@@ -475,12 +511,14 @@
   }
 
   .anilist-credit {
-    margin-top: var(--space-4);
+    margin-bottom: var(--space-2);
   }
 
   .anilist-link {
     color: var(--ink-muted);
     font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     text-underline-offset: 0.2em;
   }
 
@@ -497,7 +535,9 @@
   }
 
   .reason-heading {
-    margin: var(--space-5) 0 var(--space-2);
+    margin: var(--space-5) 0 var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-hairline);
     font-size: var(--text-xs);
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -512,30 +552,17 @@
     line-height: 1.7;
   }
 
+  .reason-list li + li {
+    margin-top: var(--space-2);
+  }
+
   .based-on {
     max-width: var(--measure);
     margin-top: var(--space-5);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-hairline);
     color: var(--ink-muted);
     font-size: var(--text-xs);
-  }
-
-  .reroll-button {
-    border: 1px solid var(--border-strong);
-    padding: var(--space-2) var(--space-4);
-    color: var(--ink-strong);
-    background: transparent;
-    font-weight: 600;
-  }
-
-  .reroll-button:hover {
-    border-color: var(--ink-strong);
-    background: var(--surface-sunken);
-  }
-
-  .reroll-button--quiet {
-    border-color: var(--border);
-    color: var(--ink-muted);
-    font-weight: 500;
   }
 
   .result-actions {
@@ -543,7 +570,34 @@
     flex-wrap: wrap;
     gap: var(--space-3);
     align-items: center;
-    margin-top: var(--space-4);
+    margin-top: var(--space-5);
+  }
+
+  .reroll-button {
+    border: 1px solid var(--ink-strong);
+    padding: var(--space-3) var(--space-5);
+    color: var(--ink-on-strong);
+    background: var(--ink-strong);
+    font-weight: 700;
+  }
+
+  .reroll-button:hover {
+    border-color: var(--accent-strong);
+    background: var(--accent-strong);
+  }
+
+  .reroll-button--quiet {
+    border-color: var(--border);
+    padding: var(--space-3) var(--space-4);
+    color: var(--ink-muted);
+    background: transparent;
+    font-weight: 500;
+  }
+
+  .reroll-button--quiet:hover {
+    border-color: var(--border-strong);
+    color: var(--ink-strong);
+    background: var(--surface-sunken);
   }
 
   .result-actions .exhausted-note {
