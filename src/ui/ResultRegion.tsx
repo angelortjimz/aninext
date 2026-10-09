@@ -19,7 +19,7 @@ function announcement(ui: UiState): string {
     case "loading":
       return "Finding your recommendation.";
     case "recommendation": {
-      const current = ui.results[ui.index] ?? ui.results[0];
+      const current = ui.results[ui.index];
       if (!current) return "";
       const position = ui.index + 1;
       const total = ui.results.length;
@@ -179,8 +179,7 @@ export function ResultRegion({
   onEditPicks,
 }: ResultRegionProps): JSX.Element | null {
   const headingRef = useRef<HTMLHeadingElement | null>(null);
-  const current =
-    ui.kind === "recommendation" ? (ui.results[ui.index] ?? ui.results[0]) : undefined;
+  const current = ui.kind === "recommendation" ? ui.results[ui.index] : undefined;
   const focusKey = isStale ? null : (current?.anime.id ?? null);
 
   useEffect(() => {
@@ -209,18 +208,19 @@ export function ResultRegion({
     );
   }
   if (!current) return null;
+  const hasAnother = ui.index + 1 < ui.results.length;
   return (
     <>
       {status}
       <RecommendationCard
         key={current.anime.id}
         recommendation={current}
-        hasAnother={ui.index + 1 < ui.results.length}
+        hasAnother={hasAnother}
         hasPrevious={ui.index > 0}
         position={ui.index + 1}
         total={ui.results.length}
         isStale={isStale}
-        onReroll={onReroll}
+        onReroll={hasAnother ? onReroll : undefined}
         onBack={onBack}
         onUndo={onUndo}
         onEditPicks={onEditPicks}

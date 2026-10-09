@@ -83,7 +83,9 @@ export function App(): JSX.Element {
 
   function handleReroll(): void {
     setUi((previous) =>
-      previous.kind === "recommendation" ? { ...previous, index: previous.index + 1 } : previous,
+      previous.kind === "recommendation"
+        ? { ...previous, index: Math.min(previous.index + 1, previous.results.length - 1) }
+        : previous,
     );
   }
 

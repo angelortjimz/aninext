@@ -379,7 +379,7 @@ describe("App", () => {
       expect(api.batch).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps the button but names a next action once the queue is exhausted", async () => {
+    it("stops offering another once the queue is exhausted", async () => {
       await showQueue(["First Pick", "Second Pick"]);
       expect(rerollButton()).toBeDefined();
 
@@ -389,6 +389,7 @@ describe("App", () => {
 
       expect(screen.getByRole("heading", { name: "Second Pick" })).toBeDefined();
       expect(screen.getByText(/Change one pick to explore again\./)).toBeDefined();
+      expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
     });
 
     it("lets the user step back to a title they skipped", async () => {

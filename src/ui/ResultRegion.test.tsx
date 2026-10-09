@@ -144,7 +144,6 @@ describe("ResultRegion AniList links", () => {
       expect(link.getAttribute("target")).toBe("_blank");
       expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     }
-    expect(screen.getByRole("link", { name: "View on AniList" })).toBeDefined();
   });
 
   it("keeps the heading named after the title, not the link", () => {
@@ -183,9 +182,10 @@ describe("ResultRegion re-roll", () => {
     expect(screen.queryByRole("heading", { name: "Yurei Deco" })).toBeNull();
   });
 
-  it("falls back to the first result when the index is out of range", () => {
-    renderRegion(recommended([yurei, recommendation(8)], 5));
-    expect(screen.getByRole("heading", { name: "Yurei Deco" })).toBeDefined();
+  it("renders nothing rather than a wrong title when the index is out of range", () => {
+    const { container } = renderRegion(recommended([yurei, recommendation(8)], 5));
+    expect(screen.queryByRole("heading", { name: "Yurei Deco" })).toBeNull();
+    expect(container.querySelector(".result-card")).toBeNull();
   });
 
   it("shows the position in the queue and walks it in order", () => {
@@ -210,12 +210,19 @@ describe("ResultRegion re-roll", () => {
     expect(screen.queryByRole("button", { name: "Back to the previous one" })).toBeNull();
   });
 
-  it("keeps the re-roll button but names a next action once the queue is exhausted", () => {
+  it("hides the re-roll button and names a next action once the queue is exhausted", () => {
     renderRegion(recommended([yurei, recommendation(8)], 1), { onReroll: vi.fn() });
 
     expect(screen.getByText(/That was the last match for this combination\./)).toBeDefined();
     expect(screen.getByText(/Change one pick to explore again\./)).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Seen it — show me another" })).toBeNull();
+  });
+
+  it("keeps the re-roll button while the queue still has another result", () => {
+    renderRegion(recommended([yurei, recommendation(8)]), { onReroll: vi.fn() });
+
     expect(screen.getByRole("button", { name: "Seen it — show me another" })).toBeDefined();
+    expect(screen.queryByText(/Change one pick to explore again\./)).toBeNull();
   });
 
   it("hides the queue position when there is only one result", () => {

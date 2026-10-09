@@ -228,6 +228,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The re-roll queue no longer runs past its last entry. `handleReroll`
+  incremented the cursor without a ceiling, and an out-of-range index fell
+  back to the first result, so pressing "Seen it — show me another" past the
+  final title showed pick #1 again under a counter reading "25 of 24" while
+  the button stayed clickable forever. The cursor is now clamped to the last
+  result, the button is hidden once the queue is exhausted (leaving the
+  existing next-action note in its place), and an out-of-range index renders
+  no card instead of the wrong title
 - The result card renders the "View on AniList" link its test asserted.
   The link was documented and covered but never rendered, so
   `ResultRegion.test.tsx` failed on a clean checkout
