@@ -177,7 +177,6 @@
 
   .selector {
     border-top: 3px solid var(--ink-strong);
-    border-bottom: 1px solid var(--border);
     padding: var(--space-5) 0 var(--space-5);
   }
 
