@@ -465,6 +465,38 @@
     font-size: var(--text-xs);
   }
 
+  .title-link {
+    color: inherit;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 0.2em;
+  }
+
+  .title-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .anilist-credit {
+    margin-top: var(--space-4);
+  }
+
+  .anilist-link {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    text-underline-offset: 0.2em;
+  }
+
+  .anilist-link:hover {
+    color: var(--ink-strong);
+  }
+
+  .credit {
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+    color: var(--ink-subtle);
+    font-size: var(--text-xs);
+  }
+
   .reason-heading {
     margin: var(--space-5) 0 var(--space-2);
     font-size: var(--text-xs);

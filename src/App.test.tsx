@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { AnimeSearchResult, RecommendationResult } from "@/models/anime";
@@ -284,6 +284,16 @@ describe("App", () => {
     ).toBeDefined();
     expect(screen.queryByText(/503/)).toBeNull();
     expect(screen.queryByText(/AniList responded/)).toBeNull();
+  });
+
+  it("credits AniList in the page footer", () => {
+    render(<App />);
+
+    const credit = screen.getByRole("contentinfo");
+    const link = within(credit).getByRole("link", { name: "AniList" });
+    expect(link.getAttribute("href")).toBe("https://anilist.co");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(within(credit).getByText(/not affiliated with AniList/)).toBeDefined();
   });
 
   it("replaces the previous result with progress while re-running", async () => {

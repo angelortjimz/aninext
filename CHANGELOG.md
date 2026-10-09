@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- A direct AniList link on the result title plus a quiet "View on
+  AniList" link on the card, both opening in a new tab with
+  `rel="noopener noreferrer"`
+- A page footer crediting AniList as the source of the anime data and
+  cover art, and stating the app is not affiliated with AniList
 - A re-roll control on the recommendation card: a "Seen it — show me
   another" button steps through the next-ranked eligible candidates
   without re-querying AniList. `recommend()` now returns the full

@@ -9,3 +9,7 @@ export function metaLine(item: AnimeSearchResult): string {
 export function studioLine(studios: string[]): string {
   return studios.join(", ");
 }
+
+export function anilistUrl(id: number): string {
+  return `https://anilist.co/anime/${encodeURIComponent(String(id))}`;
+}

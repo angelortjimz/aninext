@@ -1,7 +1,7 @@
 import { useEffect, useRef, type JSX, type RefObject } from "react";
 import type { Recommendation } from "@/models/anime";
 import type { UiState } from "@/models/ui";
-import { metaLine, studioLine } from "./format";
+import { anilistUrl, metaLine, studioLine } from "./format";
 
 interface ResultRegionProps {
   ui: UiState;
@@ -106,7 +106,14 @@ function RecommendationCard({
         )}
         <div>
           <h2 className="result-title" id="recommendation-title" ref={headingRef} tabIndex={-1}>
-            {anime.title}
+            <a
+              className="title-link"
+              href={anilistUrl(anime.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {anime.title}
+            </a>
           </h2>
           {anime.nativeTitle ? <p className="native-title">{anime.nativeTitle}</p> : null}
           <p className="meta">{metaLine(anime) || "Anime"}</p>
@@ -176,7 +183,6 @@ export function ResultRegion({
     ui.kind === "recommendation" ? (ui.results[ui.index] ?? ui.results[0]) : undefined;
   const focusKey = isStale ? null : (current?.anime.id ?? null);
 
-  // Focus the heading so a keyboard or screen reader user lands on the new answer.
   useEffect(() => {
     if (focusKey !== null) headingRef.current?.focus();
   }, [focusKey]);

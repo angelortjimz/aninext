@@ -129,7 +129,28 @@ describe("ResultRegion", () => {
 
   it("moves focus to the answer so a keyboard user learns it arrived", () => {
     renderRegion(recommended([yurei]));
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Yurei Deco" }));
+    const heading = screen.getByRole("heading", { name: "Yurei Deco" });
+    expect(document.activeElement).toBe(heading);
+    expect(heading.contains(document.activeElement)).toBe(true);
+  });
+});
+
+describe("ResultRegion AniList links", () => {
+  it("links the title and the card to the anime entry in a new tab", () => {
+    renderRegion(recommended([yurei]));
+
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).toBe("https://anilist.co/anime/7");
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    }
+    expect(screen.getByRole("link", { name: "View on AniList" })).toBeDefined();
+  });
+
+  it("keeps the heading named after the title, not the link", () => {
+    renderRegion(recommended([yurei]));
+
+    expect(screen.getByRole("heading", { name: "Yurei Deco" })).toBeDefined();
   });
 });
 

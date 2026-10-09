@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metaLine, studioLine } from "./format";
+import { anilistUrl, metaLine, studioLine } from "./format";
 
 describe("metaLine", () => {
   it("formats the full metadata a fan looks for", () => {
@@ -20,5 +20,15 @@ describe("studioLine", () => {
     expect(studioLine(["Sunrise"])).toBe("Sunrise");
     expect(studioLine(["Sunrise", "Madhouse"])).toBe("Sunrise, Madhouse");
     expect(studioLine([])).toBe("");
+  });
+});
+
+describe("anilistUrl", () => {
+  it("points at the anime entry for the given id", () => {
+    expect(anilistUrl(12345)).toBe("https://anilist.co/anime/12345");
+  });
+
+  it("never emits a path that leaves the anime namespace", () => {
+    expect(anilistUrl(-7)).toBe("https://anilist.co/anime/-7");
   });
 });

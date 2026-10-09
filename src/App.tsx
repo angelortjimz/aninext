@@ -158,6 +158,13 @@ export function App(): JSX.Element {
         onUndo={isStale && restorePoint ? handleUndo : undefined}
         onEditPicks={isStale ? handleEditPicks : undefined}
       />
+      <footer className="credit">
+        Anime data and cover art from{" "}
+        <a href="https://anilist.co" target="_blank" rel="noopener noreferrer">
+          AniList
+        </a>
+        . Recommendations are generated on your device and are not affiliated with AniList.
+      </footer>
     </main>
   );
 }
